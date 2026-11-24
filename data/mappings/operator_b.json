@@ -1,0 +1,25 @@
+{
+  "name": "Operator B - Telco MSC Switch 22-Field Raw CDR",
+  "type": "CDR",
+  "description": "Indian Cellular Core Switch (Nokia/Ericsson MSC) 22-column raw telephony log with mm:ss duration",
+  "mappings": {
+    "a_number": "source_msisdn",
+    "b_number": "destination_msisdn",
+    "call_type": "call_direction",
+    "start_time": ["call_date", "call_start_time"],
+    "duration_sec": "call_duration_mmss",
+    "imei": "device_imei",
+    "imsi": "sim_imsi",
+    "cell_id": "first_cell_id"
+  },
+  "date_format": "%d/%m/%Y %H:%M:%S",
+  "duration_format": "mm:ss",
+  "call_type_mapping": {
+    "CALL_IN": "IN",
+    "CALL_OUT": "OUT",
+    "SMS": "SMS",
+    "SMS_OUT": "SMS",
+    "IN": "IN",
+    "OUT": "OUT"
+  }
+}
