@@ -1,0 +1,17 @@
+{
+  "name": "Sandhan Police Format - IPDR Session Log",
+  "type": "IPDR",
+  "description": "Standardized Sandhan cyber crime IP detail records with session timestamps",
+  "mappings": {
+    "subscriber_number": "phone_number",
+    "source_ip": "ip_address",
+    "source_port": "source_port",
+    "destination_ip": "destination_ip",
+    "destination_port": "destination_port",
+    "session_start": "session_start",
+    "session_end": "session_end",
+    "bytes_transferred": "bytes_transferred",
+    "app_hint": "app_hint"
+  },
+  "date_format": "%Y-%m-%d %H:%M:%S"
+}
