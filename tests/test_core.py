@@ -131,3 +131,86 @@ def test_guardrail_unsupported_data(test_db):
     assert "Information Not Available in Uploaded Data" in res["answer"]
     assert "CDR and IPDR data strictly contain communication metadata" in res["answer"]
     assert res["status"] == "pending_verification"
+
+
+def test_read_and_ingest_excel_cdr(test_db):
+    import io
+    import pandas as pd
+    from app.ingest import inspect_uploaded_file
+
+    test_case = Case(id="TEST-XLSX-01", title="Excel Dynamic Test", created_by="tester")
+    test_db.add(test_case)
+    test_db.commit()
+
+    df = pd.DataFrame([
+        {
+            "Caller_MSISDN": "+919829011122",
+            "Called_MSISDN": "9829033344",
+            "Call_Dir": "OUT",
+            "Timestamp": "2026-11-22 14:15:00",
+            "Duration_Seconds": "95",
+            "Handset_IMEI": "354890123456781",
+            "SIM_IMSI": "404450111122223",
+            "Cell_Site_ID": "RAJ-JPR-101"
+        },
+        {
+            "Caller_MSISDN": "09829033344",
+            "Called_MSISDN": "9829011122",
+            "Call_Dir": "IN",
+            "Timestamp": "2026-11-22 15:00:00",
+            "Duration_Seconds": "45",
+            "Handset_IMEI": "355832119832043",
+            "SIM_IMSI": "404450333344445",
+            "Cell_Site_ID": "RAJ-JPR-102"
+        }
+    ])
+    buf = io.BytesIO()
+    df.to_excel(buf, index=False)
+    xlsx_bytes = buf.getvalue()
+
+    info = inspect_uploaded_file(xlsx_bytes, "operator_custom.xlsx")
+    assert info["format"] == "EXCEL"
+    assert info["suggested_type"] == "CDR"
+    assert info["row_count"] == 2
+    assert "Caller_MSISDN" in info["columns"]
+    assert info["suggested_mapping"]["a_number"] == "Caller_MSISDN"
+    assert info["suggested_mapping"]["b_number"] == "Called_MSISDN"
+
+    summary = ingest_cdr_data(
+        xlsx_bytes,
+        "operator_custom.xlsx",
+        "TEST-XLSX-01",
+        {"name": "Dynamic Excel", "mappings": info["suggested_mapping"]},
+        test_db
+    )
+    assert summary["valid_rows"] == 2
+    assert summary["rejected_rows"] == 0
+    assert summary["batch_id"] is not None
+
+
+def test_inspect_ipdr_and_invalid_files():
+    import io
+    import pandas as pd
+    from app.ingest import inspect_uploaded_file
+
+    df_ipdr = pd.DataFrame([
+        {
+            "Subscriber_Mobile": "9811223344",
+            "Public_NAT_IP": "103.50.10.5",
+            "NAT_Port": "51234",
+            "Session_Start": "2026-11-22 10:00:00",
+            "App_Protocol": "WhatsApp VoIP"
+        }
+    ])
+    buf = io.BytesIO()
+    df_ipdr.to_excel(buf, index=False)
+    info = inspect_uploaded_file(buf.getvalue(), "nat_logs.xlsx")
+    assert info["suggested_type"] == "IPDR"
+    assert info["suggested_mapping"]["source_ip"] == "Public_NAT_IP"
+    assert info["suggested_mapping"]["source_port"] == "NAT_Port"
+
+    with pytest.raises(ValueError):
+        inspect_uploaded_file(b"", "empty.csv")
+
+    with pytest.raises(ValueError):
+        inspect_uploaded_file(b"not-valid-content", "bad.pdf")

@@ -21,7 +21,8 @@ from app.auth import (
 from app.audit import log_audit_event, get_audit_logs
 from app.ingest import (
     get_available_mappings, save_mapping_config,
-    ingest_cdr_data, ingest_ipdr_data, seed_towers_from_csv
+    ingest_cdr_data, ingest_ipdr_data, seed_towers_from_csv,
+    inspect_uploaded_file
 )
 from app.analysis import (
     analyze_communication_patterns, find_common_numbers,
@@ -342,13 +343,25 @@ def save_mapping(
     return {"status": "saved", "mapping_id": saved_id}
 
 
+@app.post("/api/ingest/inspect")
+async def inspect_file_headers(
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_role("investigating_officer", "senior_officer", "admin"))
+):
+    content = await file.read()
+    try:
+        return inspect_uploaded_file(content, file.filename or "upload.csv")
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+
+
 @app.post("/api/cases/{case_id}/upload")
 async def upload_case_file(
     case_id: str,
     request: Request,
     file: UploadFile = File(...),
     file_type: str = Form("CDR"),  # CDR or IPDR
-    mapping_name: str = Form(""),  # mapping key from data/mappings
+    mapping_name: str = Form("auto"),  # mapping key from data/mappings or 'auto'
     custom_mapping_json: str = Form(""),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("investigating_officer", "senior_officer"))
@@ -362,22 +375,27 @@ async def upload_case_file(
 
     if custom_mapping_json:
         try:
-            chosen_mapping = json.loads(custom_mapping_json)
+            parsed = json.loads(custom_mapping_json)
+            chosen_mapping = parsed if "mappings" in parsed else {"name": "Custom Dynamic Mapping", "mappings": parsed}
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid custom mapping JSON: {e}")
+    elif mapping_name and mapping_name in mappings:
+        chosen_mapping = mappings[mapping_name]
     else:
-        chosen_mapping = mappings.get(mapping_name)
-        if not chosen_mapping:
-            # Fallback based on file type
-            if file_type == "IPDR":
-                chosen_mapping = mappings.get("ipdr_operator_a", {})
-            else:
-                chosen_mapping = mappings.get("operator_a", {})
+        # Dynamic auto-inspection when no preset mapping is matched
+        try:
+            inspected = inspect_uploaded_file(content, file.filename or "upload.csv")
+            chosen_mapping = {"name": "Auto-Detected Dynamic", "mappings": inspected["suggested_mapping"]}
+        except ValueError as ve:
+            raise HTTPException(status_code=400, detail=str(ve))
 
-    if file_type == "IPDR":
-        summary = ingest_ipdr_data(content, file.filename, case_id, chosen_mapping, db)
-    else:
-        summary = ingest_cdr_data(content, file.filename, case_id, chosen_mapping, db)
+    try:
+        if file_type.upper() == "IPDR":
+            summary = ingest_ipdr_data(content, file.filename or "upload.csv", case_id, chosen_mapping, db)
+        else:
+            summary = ingest_cdr_data(content, file.filename or "upload.csv", case_id, chosen_mapping, db)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
 
     log_audit_event(
         db, action="UPLOAD",
@@ -547,6 +565,25 @@ def get_subscriber_ipdr(
         user=current_user, request=request
     )
     return res
+
+
+@app.get("/api/cases/{case_id}/ipdr/sample")
+def get_ipdr_sample(
+    case_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("investigating_officer", "senior_officer", "admin"))
+):
+    """Return one actual uploaded IPDR session from DB for quick testing (zero hardcoding)."""
+    rec = db.query(IPDRRecord).filter(IPDRRecord.case_id == case_id).order_by(IPDRRecord.id.asc()).first()
+    if not rec:
+        return {"available": False}
+    return {
+        "available": True,
+        "source_ip": rec.source_ip,
+        "source_port": rec.source_port,
+        "timestamp": rec.session_start.replace("T", " "),
+        "subscriber": rec.subscriber_number
+    }
 
 
 # ----------------- FEATURE 6: NETWORK GRAPH -----------------

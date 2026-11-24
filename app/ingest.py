@@ -102,6 +102,111 @@ def parse_datetime_flexible(val, custom_fmt: str | None = None) -> str:
         raise ValueError(f"Unparseable date/time: '{s}'")
 
 
+def read_tabular_bytes(file_bytes: bytes, filename: str) -> tuple[pd.DataFrame, str]:
+    """Read CSV or Excel (.xlsx/.xls) bytes into a clean string DataFrame."""
+    if not file_bytes:
+        raise ValueError("Uploaded file is empty")
+
+    ext = os.path.splitext(filename.lower())[1]
+    if ext in (".xlsx", ".xls"):
+        try:
+            df = pd.read_excel(io.BytesIO(file_bytes), dtype=str, keep_default_na=False)
+            df.columns = [str(c).strip() for c in df.columns]
+            return df, "EXCEL"
+        except Exception as e:
+            raise ValueError(f"Invalid Excel file '{filename}': {e}")
+    elif ext in (".csv", ".tsv", ".txt", ""):
+        try:
+            sep = "\t" if ext == ".tsv" else ","
+            df = pd.read_csv(io.BytesIO(file_bytes), dtype=str, keep_default_na=False, sep=sep)
+            df.columns = [str(c).strip() for c in df.columns]
+            return df, "CSV"
+        except Exception as e:
+            raise ValueError(f"Invalid CSV file '{filename}': {e}")
+    else:
+        raise ValueError(f"Unsupported file format '{ext}'. Upload CSV or Excel (.xlsx/.xls).")
+
+
+def _match_column_synonym(columns: list[str], synonyms: list[str]) -> str:
+    norm_map = {re.sub(r"[^a-z0-9]", "", c.lower()): c for c in columns}
+    for syn in synonyms:
+        if syn in norm_map:
+            return norm_map[syn]
+    for syn in synonyms:
+        for norm_col, orig_col in norm_map.items():
+            if syn in norm_col:
+                return orig_col
+    return ""
+
+
+def inspect_uploaded_file(file_bytes: bytes, filename: str) -> dict:
+    """Inspect headers & sample rows of any CSV/Excel upload and auto-suggest dynamic schema mapping."""
+    df, fmt = read_tabular_bytes(file_bytes, filename)
+    columns = list(df.columns)
+    if not columns:
+        raise ValueError("No column headers found in uploaded file")
+
+    norm_joined = " ".join(re.sub(r"[^a-z0-9]", "", c.lower()) for c in columns)
+    ipdr_score = sum(1 for tok in ("publicip", "sourceip", "natip", "srcip", "sourceport", "natport", "sessionstart", "bytestransferred") if tok in norm_joined)
+    suggested_type = "IPDR" if ipdr_score >= 2 else "CDR"
+
+    if suggested_type == "IPDR":
+        suggested_mapping = {
+            "subscriber_number": _match_column_synonym(columns, ["subscribermsisdn", "subscribernumber", "msisdn", "phonenumber", "mobilenumber", "mobile", "subscriber"]),
+            "source_ip": _match_column_synonym(columns, ["sourceip", "publicnatip", "publicip", "srcip", "ipaddress", "ip"]),
+            "source_port": _match_column_synonym(columns, ["sourceport", "publicnatport", "natport", "srcport", "port"]),
+            "destination_ip": _match_column_synonym(columns, ["destinationip", "destip", "dstip", "targetip"]),
+            "destination_port": _match_column_synonym(columns, ["destinationport", "destport", "dstport"]),
+            "session_start": _match_column_synonym(columns, ["sessionstart", "sessionstarttimestamp", "starttime", "starttimestamp", "timestamp"]),
+            "session_end": _match_column_synonym(columns, ["sessionend", "sessionendtimestamp", "endtime", "endtimestamp"]),
+            "bytes_transferred": _match_column_synonym(columns, ["bytestransferred", "totalbytestransferred", "bytes", "volume"]),
+            "app_hint": _match_column_synonym(columns, ["appprotocolhint", "apphint", "application", "protocol", "service"]),
+        }
+    else:
+        suggested_mapping = {
+            "a_number": _match_column_synonym(columns, ["anumber", "callingnumber", "callermsisdn", "callernumber", "callingparty", "aparty", "srcnum", "caller", "msisdn"]),
+            "b_number": _match_column_synonym(columns, ["bnumber", "callednumber", "calledmsisdn", "calleenumber", "calledparty", "bparty", "dstnum", "callee", "target"]),
+            "call_type": _match_column_synonym(columns, ["calltype", "calldirection", "direction", "calldir", "eventtype", "type"]),
+            "start_time": _match_column_synonym(columns, ["starttime", "calldatetime", "datetime", "calltimestamp", "timestamp", "calldt", "calldate"]),
+            "duration_sec": _match_column_synonym(columns, ["durationsec", "calldurationsec", "durationseconds", "duration", "callduration", "secs", "sec"]),
+            "imei": _match_column_synonym(columns, ["imeinum", "imei", "handsetimei", "deviceimei", "imeinumber"]),
+            "imsi": _match_column_synonym(columns, ["imsinum", "imsi", "simimsi", "imsinumber"]),
+            "cell_id": _match_column_synonym(columns, ["towercellid", "cellid", "cellsiteid", "firstcgi", "cgi", "towerid", "towercode", "tower"]),
+        }
+
+    preview_rows = df.head(3).to_dict(orient="records")
+    return {
+        "filename": filename,
+        "format": fmt,
+        "columns": columns,
+        "row_count": len(df),
+        "preview_rows": preview_rows,
+        "suggested_type": suggested_type,
+        "suggested_mapping": suggested_mapping,
+    }
+
+
+def _save_import_batch(
+    db: Session, case_id: str, filename: str, file_type: str, mapping_name: str, summary: dict
+) -> dict:
+    batch = ImportBatch(
+        case_id=case_id,
+        filename=filename,
+        file_type=file_type,
+        mapping_name=mapping_name,
+        total_rows=summary["total_rows"],
+        valid_rows=summary["valid_rows"],
+        rejected_rows=summary["rejected_rows"],
+        validation_summary_json=json.dumps(summary)
+    )
+    db.add(batch)
+    db.flush()
+    summary["batch_id"] = batch.id
+    batch.validation_summary_json = json.dumps(summary)
+    db.commit()
+    return summary
+
+
 def ingest_cdr_data(
     file_bytes: bytes,
     filename: str,
@@ -109,7 +214,7 @@ def ingest_cdr_data(
     mapping_config: dict,
     db: Session
 ) -> dict:
-    df = pd.read_csv(io.BytesIO(file_bytes), dtype=str, keep_default_na=False)
+    df, _ = read_tabular_bytes(file_bytes, filename)
 
     col_map = mapping_config.get("mappings", {})
     date_fmt = mapping_config.get("date_format")
@@ -256,20 +361,7 @@ def ingest_cdr_data(
         "rejected_details": rejected_rows[:20]  # first 20 for preview
     }
 
-    batch = ImportBatch(
-        case_id=case_id,
-        filename=filename,
-        file_type="CDR",
-        mapping_name=mapping_config.get("name", "Custom"),
-        total_rows=total_rows,
-        valid_rows=len(valid_records),
-        rejected_rows=len(rejected_rows),
-        validation_summary_json=json.dumps(summary)
-    )
-    db.add(batch)
-    db.commit()
-
-    return summary
+    return _save_import_batch(db, case_id, filename, "CDR", mapping_config.get("name", "Custom"), summary)
 
 
 def ingest_ipdr_data(
@@ -279,7 +371,7 @@ def ingest_ipdr_data(
     mapping_config: dict,
     db: Session
 ) -> dict:
-    df = pd.read_csv(io.BytesIO(file_bytes), dtype=str, keep_default_na=False)
+    df, _ = read_tabular_bytes(file_bytes, filename)
 
     col_map = mapping_config.get("mappings", {})
     date_fmt = mapping_config.get("date_format", "%Y-%m-%d %H:%M:%S")
@@ -385,20 +477,7 @@ def ingest_ipdr_data(
         "rejected_details": rejected_rows[:20]
     }
 
-    batch = ImportBatch(
-        case_id=case_id,
-        filename=filename,
-        file_type="IPDR",
-        mapping_name=mapping_config.get("name", "IPDR Mapping"),
-        total_rows=total_rows,
-        valid_rows=len(valid_records),
-        rejected_rows=len(rejected_rows),
-        validation_summary_json=json.dumps(summary)
-    )
-    db.add(batch)
-    db.commit()
-
-    return summary
+    return _save_import_batch(db, case_id, filename, "IPDR", mapping_config.get("name", "IPDR Mapping"), summary)
 
 
 def seed_towers_from_csv(db: Session, csv_path: str | None = None):
