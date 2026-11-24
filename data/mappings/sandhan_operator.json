@@ -1,0 +1,25 @@
+{
+  "name": "Sandhan Police Format - Standard CDR",
+  "type": "CDR",
+  "description": "Standardized Sandhan cyber crime investigation CDR format with MOC/MTC indicators",
+  "mappings": {
+    "a_number": "calling_number",
+    "b_number": "called_number",
+    "call_type": "call_type",
+    "start_time": ["call_date", "call_time"],
+    "duration_sec": "duration_sec",
+    "imei": "imei_a",
+    "imsi": "imsi_a",
+    "cell_id": "tower_location"
+  },
+  "date_format": "%Y-%m-%d %H:%M:%S",
+  "duration_format": "seconds",
+  "call_type_mapping": {
+    "MOC": "OUT",
+    "MTC": "IN",
+    "OUT": "OUT",
+    "IN": "IN",
+    "SMS": "SMS",
+    "CALL": "OUT"
+  }
+}
