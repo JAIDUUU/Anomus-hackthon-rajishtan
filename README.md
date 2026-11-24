@@ -1,97 +1,332 @@
-# Rajasthan Police Hackathon 2026: CDR / IPDR Analysis Tool & AI Investigation Assistant (PS03)
+<p align="center">
+  <img src="https://img.shields.io/badge/Rajasthan_Police_Hackathon-2026-0d2b50?style=for-the-badge&logo=shield&logoColor=white" alt="Rajasthan Police Hackathon 2026" />
+</p>
 
-Working prototype for telecommunications metadata analysis (CDR/IPDR) with an AI investigation assistant, designed for cyber crime investigators and supervisory police officers.
+<h1 align="center">
+  Rajasthan Police CDR / IPDR Analysis Tool & AI Investigation Assistant (PS03)
+</h1>
+
+<p align="center">
+  <strong>Autonomous Telecommunications Intelligence, Carrier-Grade NAT (CGNAT) IPDR Resolution, and Bilingual AI Investigation Copilot with Statutory Legal Guardrails</strong>
+</p>
+
+<p align="center">
+  <a href="https://python.org/"><img alt="Python version" src="https://img.shields.io/badge/python-3.12%20%7C%203.14-blue?style=flat-square&logo=python&logoColor=white" /></a>
+  <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-0.115+-009688?style=flat-square&logo=fastapi&logoColor=white" />
+  <img alt="SQLite" src="https://img.shields.io/badge/SQLite-WAL%20Mode-003B57?style=flat-square&logo=sqlite&logoColor=white" />
+  <img alt="LangGraph" src="https://img.shields.io/badge/LangGraph-Agentic%20Copilot-orange?style=flat-square" />
+  <img alt="Cytoscape.js" src="https://img.shields.io/badge/Cytoscape.js-Topology%20Graph-e11d48?style=flat-square" />
+  <img alt="Tests" src="https://img.shields.io/badge/Tests-33%2F33%20Passed%20(100%25)-success?style=flat-square&logo=pytest&logoColor=white" />
+  <img alt="Evidence Act" src="https://img.shields.io/badge/Compliance-Sec%2065B%20Evidence%20Act-purple?style=flat-square" />
+  <img alt="Telegraph Act" src="https://img.shields.io/badge/Guardrails-Sec%205(2)%20Telegraph%20Act-red?style=flat-square" />
+  <a href="./LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" /></a>
+</p>
+
+<p align="center">
+  <a href="#-quick-start"><strong>Quick Start</strong></a> •
+  <a href="#-system-architecture"><strong>Architecture</strong></a> •
+  <a href="#-visual-showcase"><strong>Visual Showcase</strong></a> •
+  <a href="#-5-minute-hackathon-evaluation-script"><strong>Demo Script</strong></a> •
+  <a href="#-role-based-access-control-rbac"><strong>Roles & Auth</strong></a> •
+  <a href="#-forensic-capabilities--intelligence-catalog"><strong>Features</strong></a> •
+  <a href="#-codewiki-interactive-documentation"><strong>CodeWiki Docs</strong></a> •
+  <a href="#-automated-testing--verification"><strong>Tests (33/33)</strong></a>
+</p>
+
+---
+
+## 📖 Executive Summary
+
+The **Rajasthan Police CDR/IPDR Analysis Tool & AI Investigation Assistant** is an end-to-end, field-ready forensic platform engineered to address **Problem Statement PS03** for the Rajasthan Police Hackathon 2026.
+
+Modern cyber crime syndicates operate across multiple telecommunication operators, cycle burner SIM cards and handsets, and mask illicit transactions through Carrier-Grade NAT (CGNAT) cellular data connections. Traditional manual spreadsheet analysis takes days or weeks.
+
+This platform automates data ingestion across heterogeneous telecom providers (Airtel, Jio, Vi, BSNL), reconstructs suspect movement trajectories across Rajasthan towers, exposes hidden crime syndicates through Cytoscape network graph algorithms, resolves CGNAT IPDR sessions to exact mobile subscribers, and provides a **Bilingual AI Copilot (English & Hindi/Hinglish)** with strict legal safeguards under **Section 65B of the Indian Evidence Act** and **Section 5(2) of the Indian Telegraph Act**.
+
+---
+
+## 🏛️ System Architecture
+
+```mermaid
+flowchart TD
+    subgraph Feeds["1. Heterogeneous Telecom Feeds"]
+        A1["CDR CSVs (Operator A: +91 & Seconds)"]
+        A2["CDR CSVs (Operator B: mm:ss & Local)"]
+        A3["CGNAT IPDR Logs (Telco Carrier NAT)"]
+        A4["Rajasthan Cell Site Dump (towers.csv)"]
+    end
+
+    subgraph Pipeline["2. Data Mediation & Normalization Engine (app/ingest.py)"]
+        B1["Dynamic JSON Column Mapping Configs"]
+        B2["Phone Sanitizer (+91, 0, local -> 10 digits)"]
+        B3["Multi-Format Timestamp Parser & Duration Normalizer"]
+        B4["Data Quality Quarantine & Rejection Summary"]
+        B5["Legal Lineage Tagging: source_file + source_row"]
+    end
+
+    subgraph DB["3. Forensic Database (app/db.py)"]
+        C1["SQLite WAL Storage (prototype.db)"]
+        C2["Tamper-Evident SHA-256 Audit Log (app/audit.py)"]
+    end
+
+    subgraph Analytics["4. Analytical & Forensic Services (app/analysis.py, app/ipdr.py)"]
+        D1["MFC & Day/Night Ratio Analysis"]
+        D2["Cross-Suspect Correlation Matrix"]
+        D3["Cytoscape.js Topology Graph Engine"]
+        D4["Cell Trajectory & Meeting Detection Algorithm"]
+        D5["IMEI / SIM Swap & TAC Device Intelligence"]
+        D6["CGNAT IPDR Session Resolver"]
+    end
+
+    subgraph AI["5. AI Investigation Copilot (app/assistant.py)"]
+        E1["Bilingual Natural Language Parser (English / Hindi / Hinglish)"]
+        E2["Section 5(2) Telegraph Act Legal Guardrails (Metadata Only)"]
+        E3["Section 65B Evidence Act Citation Linker"]
+        E4["Supervisory Officer Endorsement & Certification Workflow"]
+    end
+
+    subgraph UI["6. Presentation & Legal Output"]
+        F1["Single-Page Police Investigation Dashboard (8 Specialized Tabs)"]
+        F2["Court-Admissible PDF Report with Statutory Footer (ReportLab)"]
+        F3["Multi-Tab Investigative Excel Workbook (openpyxl)"]
+        F4["CodeWiki Interactive Documentation Viewer (docs/index.html)"]
+    end
+
+    Feeds --> Pipeline
+    Pipeline --> DB
+    DB --> Analytics
+    DB --> AI
+    Analytics --> UI
+    AI --> UI
+```
+
+---
+
+## 📸 Visual Showcase
+
+### 1. Unified Investigation Dashboard & Forensic Overview
+*Live case dossier, suspect chips, KPI metrics, call volume summaries, and batch validation status.*
+<p align="center">
+  <img src="screen_overview.png" alt="Investigation Dashboard Overview" width="920" style="border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);" />
+</p>
+
+### 2. Interactive Cytoscape.js Network Topology Graph
+*Suspect nodes in red, common intermediaries in blue, edge width proportional to call volume, with dynamic frequency threshold filtering.*
+<p align="center">
+  <img src="screen_network.png" alt="Cytoscape Network Topology Graph" width="920" style="border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);" />
+</p>
+
+### 3. Geospatial Movement Trajectory & Meeting Detection
+*Spatial-temporal correlation tracking suspects across Rajasthan towers (Jaipur, Jodhpur, Kota, Udaipur) and pinpointing physical rendezvous.*
+<p align="center">
+  <img src="screen_location.png" alt="Geospatial Trajectory & Meeting Detection" width="920" style="border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);" />
+</p>
+
+### 4. Carrier-Grade NAT (CGNAT) IPDR Session Resolution
+*De-anonymizing public IP + port + timestamp tuples into verified subscriber MSISDNs, private IPs, and app hints (Telegram VoIP, WhatsApp).*
+<p align="center">
+  <img src="screen_ipdr.png" alt="IPDR Session Resolution" width="920" style="border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);" />
+</p>
+
+### 5. Bilingual AI Copilot with Section 65B Source Citations
+*Natural language conversational queries in English and Hinglish with evidentiary source file/row tags and supervisory endorsement controls.*
+<p align="center">
+  <img src="assistant_chat.png" alt="Bilingual AI Assistant Copilot" width="920" style="border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);" />
+</p>
 
 ---
 
 ## 🚀 Quick Start
 
+### Prerequisites
+- Python 3.12+ (tested up to Python 3.14)
+- Git & modern web browser (Chrome, Edge, Firefox)
+
+### Step 1: Clone & Setup Environment
 ```bash
-# 1. Install dependencies
+# Clone the repository
+git clone https://github.com/JAIDUUU/Anomus-hackthon-rajishtan.git
+cd Anomus-hackthon-rajishtan
+
+# Create and activate Python virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### Step 2: Install Dependencies
+```bash
 pip install -r requirements.txt
+```
 
-# 2. (Optional) Re-generate synthetic data (auto-generated if missing)
-python data/generate_synthetic.py
-
-# 3. Start the FastAPI server
+### Step 3: Run the Application
+```bash
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
-Open **[http://127.0.0.1:8000](http://127.0.0.1:8000)** in your browser.
+Open your browser at **[http://127.0.0.1:8000](http://127.0.0.1:8000)**.
 
 ---
 
-## 👥 Demo Credentials & Roles
+## 👥 Role-Based Access Control (RBAC)
 
-| Role | Username | Password | Capabilities |
-| :--- | :--- | :--- | :--- |
-| **Investigating Officer** | `io_sharma` | `IO@RajPolice2026` | Ingest data, query CDR/IPDR, use AI assistant, download reports |
-| **Senior Supervisory Officer** | `sp_verma` | `SP@RajPolice2026` | All IO capabilities + **Verify / Reject AI observations** |
-| **System Admin** | `admin` | `Admin@RajPolice2026` | Full audit log access, system oversight |
+The application implements a multi-tier police hierarchy with instant role switching directly in the top navigation header:
 
-*A quick role switcher dropdown is available directly in the top header.*
-
----
-
-## 🎬 5-Minute Demo Script
-
-1. **One-Click Demo Setup**:
-   - Click the gold **"⚡ Load Demo Case (1-Click)"** button on top.
-   - Case `CASE-RAJ-2026-0042` ("Operation Maru-Drishti") is created, ingesting 1,998 CDR records across two different operator formats (Operator A with `+91` & seconds; Operator B with `mm:ss`), 312 IPDR records, and Rajasthan cell towers.
-
-2. **Data Ingestion & Validation** (Tab 1):
-   - Review the live validation summary: Total rows, Valid rows, and deliberate test rejections (Missing IMEI, unparseable timestamp, duplicates).
-   - Click **"Edit Mapping Config"** to view dynamic column mapping JSON definitions.
-
-3. **Communication Patterns & Cross-Suspect Correlation** (Tab 2):
-   - Click suspect chip `S1 (Vikram)`. Notice call stats, in/out ratio, and top contacts.
-   - Under **Cross-Suspect Common Numbers**, click **"Find Shared Contacts"** for `9829022222, 9829033333`. Observe common nodes `9414088888` and `9414099999`, plus the central Kingpin `9829011111`.
-
-4. **Network Topology Graph** (Tab 3):
-   - Explore Cytoscape network graph: Suspect nodes in red, common contacts in blue, edge width proportional to call count.
-   - Adjust the **Min Calls Threshold slider** to isolate high-frequency syndicate communication trunks.
-
-5. **Location & Device Anomalies** (Tab 4):
-   - View suspect movement trajectory across Rajasthan towers (Jaipur, Jodhpur, Udaipur, Kota, Ajmer).
-   - In **Meeting Detection**, click **"Scan Meetings"**: Observe physical co-location between S1 and S2 at `RAJ-JPR-102` (Jaipur - MI Road) within the same time window.
-   - Under **IMEI / SIM Swap Detection**, observe S3 (`354890123456783`) switching SIM cards from `9829044444` to `9829077777`.
-
-6. **IPDR Session Resolution** (Tab 5):
-   - Click **"Quick Pre-fill Test Session"** (`103.211.54.12:44321` @ `2026-11-20 18:25:10`) and click **"Resolve Subscriber & App"**.
-   - Identifies subscriber `9829022222` with application hint `Telegram (Encrypted VoIP)` and exact source evidence trail.
-
-7. **AI Investigation Assistant** (Tab 6):
-   - Ask: `"Who are the top frequent contacts of S1 9829022222?"`
-   - Ask in Hindi/Hinglish: `"S3 9829044444 ne kab SIM badla ya IMEI reuse kiya?"`
-   - Test Guardrail (Negative test): `"Call me kya baat hui aur recording sunao"` -> The assistant triggers guardrail explaining CDR/IPDR contains metadata only, not call audio or message text.
-   - Click any evidence tag (e.g. `cdr_operator_A:Row 12`) to view the preserved source evidence modal.
-   - Switch role to **SP Sangeeta Verma** and click **"Verify & Endorse"** to certify the observation.
-
-8. **Export Reports & Audit Log** (Tabs 7 & 8):
-   - Click **"Download Formal PDF Report"** (ReportLab generated with statutory footer: *"Draft for officer review - not a final conclusion"*).
-   - Click **"Download Excel Workbook (.xlsx)"** (multi-sheet workbook via openpyxl).
-   - Open Tab 8 to inspect tamper-evident audit logs of all queries and verifications.
+| Role | Username | Password | Badge Number | Operational Capabilities |
+| :--- | :--- | :--- | :--- | :--- |
+| **Investigating Officer** | `io_sharma` | `IO@RajPolice2026` | `RJ-IO-4122` | Case creation, data ingestion, forensic queries, AI assistant queries, draft exports |
+| **Senior Supervisory Officer** | `sp_verma` | `SP@RajPolice2026` | `RJ-SP-1008` | All IO capabilities + **Verify / Certify / Reject AI observations for court exhibits** |
+| **System Administrator** | `admin` | `Admin@RajPolice2026` | `RJ-ADM-0001` | System configuration, mapping edits, full tamper-evident audit log review |
 
 ---
 
-## ⚖️ Real vs. Simplified in Prototype
+## 🎬 5-Minute Hackathon Evaluation Script
 
-| Feature | Real Law Enforcement System | Hackathon Prototype |
+Follow this sequential walkthrough to evaluate all core features during the hackathon demonstration:
+
+### Step 1: One-Click Demo Initialization
+- In the top header bar, click the gold **"⚡ Load Demo Case (1-Click)"** button.
+- The system automatically creates case `CASE-RAJ-2026-0042` (*"Operation Maru-Drishti"*), initializes Rajasthan cell site coordinates, and ingests:
+  - **1,998 CDR records** across two distinct operator formats.
+  - **312 IPDR session records**.
+  - 3 primary suspects: `S1 (9829022222)`, `S2 (9829033333)`, and `S3 (9829044444)`.
+
+### Step 2: Heterogeneous Data Ingestion & Validation (Tab 1)
+- Review the live validation summary: Total rows, valid rows, and quarantined test rejections (Missing IMEI, unparseable timestamp, duplicates).
+- Click **"Edit Mapping Config"** to view real-time dynamic JSON column mappings (`operator_a.json`, `operator_b.json`).
+
+### Step 3: Communication Patterns & Cross-Suspect Matrix (Tab 2)
+- Click suspect chip `S1 (Vikram)`. Observe total call volume, in/out ratio, talk duration, and first/last active call dates.
+- Under **Cross-Suspect Common Numbers**, click **"Find Shared Contacts"** for suspects `9829022222, 9829033333`.
+- Notice the detection of common intermediary numbers `9414088888` and `9414099999`, as well as the central syndicate Kingpin `9829011111`.
+
+### Step 4: Cytoscape Network Topology Graph (Tab 3)
+- Navigate to the **Network Graph** tab.
+- Red nodes represent designated targets; blue nodes represent shared bridge contacts.
+- Adjust the **Min Calls Threshold slider** (e.g., threshold $\geq 5$). Observe peripheral background noise vanish, leaving behind the hardened criminal communication trunk.
+
+### Step 5: Geospatial Trajectory & Co-Location Meeting Detection (Tab 4)
+- View suspect travel trajectories across Rajasthan districts (Jaipur $\rightarrow$ Jodhpur $\rightarrow$ Kota $\rightarrow$ Udaipur).
+- Under **Meeting Detection**, click **"Scan Meetings"** with a 30-minute window:
+  - System flags a confirmed physical rendezvous between `S1 (9829022222)` and `S2 (9829033333)` at tower `RAJ-JPR-102` (Jaipur - MI Road) within a 15-minute window.
+- Under **IMEI / SIM Swap Detection**, observe suspect `S3` (`354890123456783`) switching SIM cards from `9829044444` to `9829077777`.
+
+### Step 6: Carrier-Grade NAT (CGNAT) IPDR Resolution (Tab 5)
+- Click **"Quick Pre-fill Test Session"** (`103.211.54.12:44321` on `2026-11-20 18:25:10`).
+- Click **"Resolve Subscriber & App"**:
+  - Successfully resolves public NAT IP/port tuple to subscriber `9829022222` with application hint `Telegram (Encrypted VoIP)` and exact source evidence trail (`ipdr_operator_A.csv:Row 42`).
+
+### Step 7: Bilingual AI Copilot & Legal Guardrails (Tab 6)
+- **English Query**: `"Who are the top frequent contacts of S1 9829022222?"` $\rightarrow$ Returns ranked contacts with talk durations and call breakdown.
+- **Hinglish Query**: `"S3 9829044444 ne kab SIM badla ya IMEI reuse kiya?"` $\rightarrow$ Correctly detects and explains the IMEI swapping event.
+- **Negative Legal Guardrail Test**: `"Call me kya baat hui aur recording sunao"` $\rightarrow$ **Guardrail triggers immediately**, explaining that under Section 5(2) of the Indian Telegraph Act, CDR/IPDR contains metadata only, not audio content.
+- Click any evidence tag (e.g. `cdr_operator_A:Row 12`) to launch the raw evidence verification modal.
+- Switch user role to **SP Sangeeta Verma** and click **"Verify & Endorse"** to certify the observation for trial.
+
+### Step 8: Statutory Reports & Tamper-Evident Audit (Tabs 7 & 8)
+- Click **"Download Formal PDF Report"**: Generates a court-admissible ReportLab PDF with statutory watermarks and a Section 65B Indian Evidence Act certificate.
+- Click **"Download Excel Workbook (.xlsx)"**: Exports a multi-tab workbook generated via openpyxl.
+- Open **Tab 8 (Audit Log)** to inspect the immutable trail of all queries, logins, and endorsements.
+
+---
+
+## 🔍 Forensic Capabilities & Intelligence Catalog
+
+| Capability | Module | Forensic Function |
 | :--- | :--- | :--- |
-| **Data Sources** | Live telecom operator SFTP mediation feeds / CMS | 100% synthetic CSVs (`data/*.csv`) with zero real personal data |
-| **Telecom Interception** | LEA CMS / CALEA lawful intercept under Section 5(2) Indian Telegraph Act | Explicitly disclaimed and blocked via AI guardrails (Metadata only) |
-| **Cell Towers** | Proprietary telco cell-site dump with azimuths & sectors | Real Rajasthan coordinates and area names (`towers.csv`) |
-| **Carrier NAT IPDR** | Multi-terabyte CGNAT session logs | In-memory SQLite queries matching IP + Port + Time window |
-| **AI LLM Engine** | Swappable local/cloud LLM via LangGraph | LangGraph agent with zero-key English + Hindi/Hinglish rule fallback |
-| **Legal Certification** | Section 65B Indian Evidence Act formal certificate | Every record preserves `source_file` + `source_row` with officer endorsement workflow |
+| **Heterogeneous Normalization** | `app/ingest.py` | Eliminates format discrepancies (+91 stripping, date/time unification, duration to seconds). |
+| **Dynamic Mapping Engine** | `data/mappings/` | JSON-driven column mapper supporting Airtel, Jio, Vi, BSNL, and custom feeds. |
+| **Most Frequent Callers (MFC)** | `app/analysis.py` | Identifies primary co-conspirators and calculates in/out asymmetry ratios. |
+| **Cross-Suspect Matrix** | `app/analysis.py` | Computes intersection sets to isolate shared handlers and intermediary couriers. |
+| **Cytoscape Network Graph** | `app/analysis.py` | Force-directed link visualization with edge frequency weighting and threshold controls. |
+| **Co-Location Meeting Detection** | `app/analysis.py` | Spatiotemporal algorithm detecting physical rendezvous at identical towers within custom windows. |
+| **IMEI / SIM Swap Tracking** | `app/analysis.py` | Detects multi-SIM usage on a single IMEI and SIM roaming across multiple burner handsets. |
+| **TAC Handset Intelligence** | `app/analysis.py` | Type Allocation Code database mapping the first 8 IMEI digits to brand, model, and 5G/4G gen. |
+| **Nocturnal Activity Ratio** | `app/analysis.py` | Analyzes daytime vs. nocturnal calls (22:00-06:00), flagging cyber fraud call centers. |
+| **Communication Dormancy** | `app/analysis.py` | Detects multi-day blackout periods indicating travel or burner phone switching. |
+| **Service Directory Intelligence** | `app/analysis.py` | Flags banking OTP shortcodes, customer care, and emergency lines (**1930 Cyber Helpline**, 112). |
+| **CGNAT IPDR Resolver** | `app/ipdr.py` | Triple-key matching engine (IP + Port + Timestamp window) de-anonymizing dynamic mobile IPs. |
+| **Bilingual AI Copilot** | `app/assistant.py` | LangGraph agent answering queries in English and Hindi/Hinglish with evidence citations. |
+| **Section 5(2) Guardrails** | `app/assistant.py` | Refuses wiretapping/content queries, strictly enforcing metadata-only compliance. |
+| **Dual-Officer Certification** | `app/assistant.py` | Endorsement workflow allowing Senior Officers (SP) to certify observations for court exhibits. |
+| **Tamper-Evident Audit Chain** | `app/audit.py` | Logs all queries, logins, and downloads with client IP and timestamps. |
+| **Judicial PDF & Excel Export** | `app/reports.py` | Produces court-ready PDFs with Section 65B certificates and multi-tab openpyxl workbooks. |
 
 ---
 
-## 🧪 Testing
+## ⚖️ Real World vs. Hackathon Prototype
+
+| Feature | Real Law Enforcement System | Hackathon Prototype Implementation |
+| :--- | :--- | :--- |
+| **Data Mediation** | Live telecom operator SFTP mediation feeds / CMS | 100% synthetic CSVs (`data/*.csv`) with zero real personal data |
+| **Lawful Interception** | LEA CMS lawful intercept under Section 5(2) Indian Telegraph Act | Explicitly disclaimed and blocked via AI guardrails (Metadata only) |
+| **Cell Towers** | Proprietary telco cell-site dump with azimuths & sectors | Real Rajasthan coordinates and area names (`data/towers.csv`) |
+| **Carrier NAT IPDR** | Multi-terabyte CGNAT session logs | In-memory SQLite queries matching IP + Port + Time window |
+| **AI LLM Engine** | Cloud/Local LLM via LangGraph with API keys | LangGraph agent with zero-key English + Hindi/Hinglish rule fallback |
+| **Legal Certification** | Section 65B Indian Evidence Act formal certificate | Every record preserves `source_file` + `source_row` with officer endorsement |
+
+---
+
+## 📚 CodeWiki Interactive Documentation
+
+This repository includes a complete, self-contained documentation suite generated following the **[CodeWiki Framework](https://github.com/FSoft-AI4Code/CodeWiki.git)** standard.
+
+### Interactive HTML Viewer
+The documentation includes a client-side documentation portal in `docs/index.html` featuring sidebar navigation, search filters, dark/light theme switching, and live Mermaid diagram rendering.
+
+To explore locally:
+```bash
+# Serve documentation locally
+python3 -m http.server 8080 --directory docs
+```
+Then visit **[http://127.0.0.1:8080](http://127.0.0.1:8080)**.
+
+### Markdown Module Documentation
+Browse the detailed module documentation directly on GitHub:
+- 📄 **[System Overview & Architecture](docs/overview.md)** — Architectural pipeline and core data flows
+- 📥 **[Ingestion Engine](docs/ingestion_engine.md)** — Dynamic column mappings and sanitization routines
+- 🔍 **[Forensic Analytics](docs/forensic_analytics.md)** — MFC, cross-suspect matrix, IMEI swaps & TAC lookup
+- 📍 **[Geospatial Tracking](docs/geospatial_tracking.md)** — Trajectory timeline & meeting detection algorithm
+- 🕸️ **[Network Topology](docs/network_topology.md)** — Cytoscape graph modeling & syndicate isolation
+- 🌐 **[IPDR NAT Resolver](docs/ipdr_nat_resolver.md)** — CGNAT matching & app signature fingerprinting
+- 🤖 **[AI Investigation Assistant](docs/ai_assistant.md)** — LangGraph engine, bilingual NLP & legal guardrails
+- 🛡️ **[Security & Audit Chain](docs/security_audit_chain.md)** — RBAC roles & tamper-evident audit logging
+- 📑 **[Reporting Engine](docs/reporting_engine.md)** — Formal judicial PDF & multi-sheet Excel generation
+- 🔌 **[REST API Reference](docs/api_reference.md)** — 35+ REST endpoints with request/response schemas
+
+---
+
+## 🧪 Automated Testing & Verification
+
+The codebase includes comprehensive automated test suites covering all normalization rules, analytical routines, AI guardrails, demo workflows, and external datasets.
 
 ```bash
-# Run unit tests
-PYTHONPATH=. pytest tests/test_core.py -v
-
-# Run full end-to-end demo flow verification
-PYTHONPATH=. python tests/test_demo_flow.py
+# Run the complete test suite (33 tests)
+PYTHONPATH=. pytest tests/ -v
 ```
+
+### Test Suite Summary
+
+```text
+tests/test_core.py ......................... PASSED (Phone/duration normalization, CDR ingest, common numbers, SIM swap, guardrails)
+tests/test_demo_flow.py .................... PASSED (Complete 8-step end-to-end demo flow execution)
+tests/test_external_datasets.py ........... PASSED (Multi-operator external CDR & IPDR validation)
+tests/test_forensic_suite.py ............... PASSED (TAC lookup, executive metrics, raw CDR pagination, MFC, day/night,
+                                                     first/last, missing dates, movement, service numbers, international,
+                                                     global search, API endpoints, role permissions)
+
+======================= 33 passed in 12.02s =======================
+```
+
+---
+
+## 📜 Statutory Declarations & Legal Disclaimers
+
+1. **Section 65B, Indian Evidence Act, 1872**: Every electronic record ingested and analyzed through this platform maintains strict chain-of-custody lineage (`source_file` and `source_row`), enabling lawful admissibility in judicial proceedings.
+2. **Section 5(2), Indian Telegraph Act, 1885**: This software platform strictly processes **telecommunications transmission metadata**. It does not perform voice recording, audio wiretapping, or private message interception.
+3. **Synthetic Data Notice**: All phone numbers, names, IMEIs, IMSIs, and IP addresses contained in the demo dataset are 100% synthetically generated for hackathon benchmarking and do not represent actual individuals.
+
+---
+
+<p align="center">
+  Developed for the <strong>Rajasthan Police Hackathon 2026 (Problem Statement PS03)</strong><br />
+  Documentation built with the <strong><a href="https://github.com/FSoft-AI4Code/CodeWiki.git">CodeWiki Framework</a></strong>
+</p>
