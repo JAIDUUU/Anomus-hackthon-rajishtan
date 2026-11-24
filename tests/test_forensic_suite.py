@@ -432,3 +432,18 @@ def test_api_link_analysis(auth_headers):
     data = r.json()
     assert len(data["shared_contacts"]) >= 2
 
+
+def test_external_config_loading():
+    import os
+    assert os.path.exists("data/config/tac_database.json")
+    assert os.path.exists("data/config/service_directory.json")
+    tac_db = an.load_tac_database()
+    srv_db = an.load_service_directory()
+    assert "35489012" in tac_db
+    assert "35649210" in tac_db  # merged from main.py KNOWN_TACS
+    assert "1930" in srv_db
+    res = an.lookup_tac_device("356492104581294")
+    assert res["brand"] == "Apple"
+    assert "mfr" in res and "origin" in res
+
+

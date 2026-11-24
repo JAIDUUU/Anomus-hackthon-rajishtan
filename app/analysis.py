@@ -1,5 +1,6 @@
 import json
 import math
+import os
 import re
 from datetime import datetime, timedelta
 from collections import defaultdict
@@ -8,59 +9,28 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, desc, asc, func
 from app.db import CDRRecord, IPDRRecord, CellTower, Case
 
-# ----------------- TAC / DEVICE DATABASE -----------------
-TAC_DATABASE = {
-    # Apple
-    "35489012": {"brand": "Apple", "model": "iPhone 15 Pro Max", "generation": "5G (VoNR/VoLTE)", "device_type": "Smartphone", "manufacturer": "Apple Inc."},
-    "35284110": {"brand": "Apple", "model": "iPhone 14 Pro", "generation": "5G (VoNR/VoLTE)", "device_type": "Smartphone", "manufacturer": "Apple Inc."},
-    "35324911": {"brand": "Apple", "model": "iPhone 13", "generation": "5G (VoNR/VoLTE)", "device_type": "Smartphone", "manufacturer": "Apple Inc."},
-    "35942109": {"brand": "Apple", "model": "iPhone 12", "generation": "5G (VoLTE)", "device_type": "Smartphone", "manufacturer": "Apple Inc."},
-    # Samsung
-    "35489099": {"brand": "Samsung", "model": "Galaxy S24 Ultra", "generation": "5G (VoNR/VoLTE)", "device_type": "Smartphone", "manufacturer": "Samsung Electronics"},
-    "35583211": {"brand": "Samsung", "model": "Galaxy S23 5G", "generation": "5G (VoNR/VoLTE)", "device_type": "Smartphone", "manufacturer": "Samsung Electronics"},
-    "35741209": {"brand": "Samsung", "model": "Galaxy A54 5G", "generation": "5G (VoLTE)", "device_type": "Smartphone", "manufacturer": "Samsung Electronics"},
-    # OnePlus
-    "35891000": {"brand": "OnePlus", "model": "12 5G", "generation": "5G (VoNR/VoLTE)", "device_type": "Smartphone", "manufacturer": "OnePlus Technology"},
-    "35789010": {"brand": "OnePlus", "model": "Nord CE 3", "generation": "5G (VoLTE)", "device_type": "Smartphone", "manufacturer": "OnePlus Technology"},
-    # Xiaomi / Poco / Redmi
-    "86498504": {"brand": "Xiaomi", "model": "Redmi Note 12 Pro 5G", "generation": "5G (VoNR/VoLTE)", "device_type": "Smartphone", "manufacturer": "Xiaomi Communications"},
-    "35912307": {"brand": "Poco", "model": "X5 Pro 5G", "generation": "5G (VoNR/VoLTE)", "device_type": "Smartphone", "manufacturer": "Xiaomi Communications (Poco)"},
-    "86214506": {"brand": "Xiaomi", "model": "13 Pro 5G", "generation": "5G (VoNR/VoLTE)", "device_type": "Smartphone", "manufacturer": "Xiaomi Communications"},
-    # Vivo / iQOO
-    "86753405": {"brand": "Vivo", "model": "V29 5G", "generation": "5G (VoNR/VoLTE)", "device_type": "Smartphone", "manufacturer": "Vivo Mobile Communication"},
-    "86129804": {"brand": "iQOO", "model": "Neo 7 Pro 5G", "generation": "5G (VoNR/VoLTE)", "device_type": "Smartphone", "manufacturer": "Vivo Mobile Communication"},
-    # Oppo
-    "86932104": {"brand": "Oppo", "model": "Reno 10 5G", "generation": "5G (VoNR/VoLTE)", "device_type": "Smartphone", "manufacturer": "Guangdong Oppo Mobile"},
-    # Realme
-    "35612309": {"brand": "Realme", "model": "11 Pro+ 5G", "generation": "5G (VoNR/VoLTE)", "device_type": "Smartphone", "manufacturer": "Realme Chongqing"},
-    # Google
-    "35175608": {"brand": "Google", "model": "Pixel 7 Pro", "generation": "5G (VoNR/VoLTE)", "device_type": "Smartphone", "manufacturer": "Google LLC"},
-    "35823411": {"brand": "Google", "model": "Pixel 8 Pro", "generation": "5G (VoNR/VoLTE)", "device_type": "Smartphone", "manufacturer": "Google LLC"},
-    # Motorola
-    "35712308": {"brand": "Motorola", "model": "Edge 40 5G", "generation": "5G (VoNR/VoLTE)", "device_type": "Smartphone", "manufacturer": "Motorola Mobility (Lenovo)"},
-    # Feature Phone / Jio
-    "01345600": {"brand": "Nokia", "model": "105 Dual SIM", "generation": "2G (GSM)", "device_type": "Feature Phone", "manufacturer": "HMD Global (Nokia)"},
-    "86012303": {"brand": "Jio", "model": "Phone Next", "generation": "4G (VoLTE)", "device_type": "Smartphone", "manufacturer": "Reliance Retail"}
-}
+CONFIG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "config")
 
-SERVICE_DIRECTORY = {
-    "1800112211": {"service_name": "State Bank of India (SBI) Helpline", "category": "Banking / Financial"},
-    "18602662666": {"service_name": "HDFC PhoneBanking Gateway", "category": "Banking / Financial"},
-    "18002584455": {"service_name": "Bank of Baroda Customer Service", "category": "Banking / Financial"},
-    "18001080": {"service_name": "ICICI Bank Helpline", "category": "Banking / Financial"},
-    "18002095555": {"service_name": "Axis Bank Toll-Free", "category": "Banking / Financial"},
-    "18004250018": {"service_name": "Canara Bank Toll-Free", "category": "Banking / Financial"},
-    "18001802222": {"service_name": "Punjab National Bank Toll-Free", "category": "Banking / Financial"},
-    "1930": {"service_name": "National Cyber Crime Reporting Helpline", "category": "Emergency / Law Enforcement"},
-    "112": {"service_name": "National Emergency Response System (ERSS)", "category": "Emergency / Law Enforcement"},
-    "100": {"service_name": "Police Control Room Helpline", "category": "Emergency / Law Enforcement"},
-    "1090": {"service_name": "Women Power Line Helpline", "category": "Emergency / Law Enforcement"},
-    "121": {"service_name": "Telecom Service Provider Customer Care", "category": "Telecom Service"},
-    "198": {"service_name": "Telecom Complaints Resolution Line", "category": "Telecom Service"},
-    "56161": {"service_name": "Banking OTP / Alert Shortcode Gateway", "category": "OTP / Alert Gateway"},
-    "567676": {"service_name": "Transaction Verification Alert Gateway", "category": "OTP / Alert Gateway"},
-    "54321": {"service_name": "Telecom Value Added Services", "category": "Telecom Service"},
-}
+
+def _load_json_config(filename: str) -> dict:
+    """Load external JSON lookup config dynamically from data/config/."""
+    path = os.path.join(CONFIG_DIR, filename)
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def load_tac_database() -> dict:
+    return _load_json_config("tac_database.json")
+
+
+def load_service_directory() -> dict:
+    return _load_json_config("service_directory.json")
 
 INTERNATIONAL_PREFIXES = {
     "+971": ("United Arab Emirates (Dubai)", "HIGH"),
@@ -111,8 +81,9 @@ def is_service_number(number: str | None) -> tuple[bool, str, str]:
     if not number:
         return (False, "", "")
     s = str(number).strip()
-    if s in SERVICE_DIRECTORY:
-        return (True, SERVICE_DIRECTORY[s]["service_name"], SERVICE_DIRECTORY[s]["category"])
+    srv_dir = load_service_directory()
+    if s in srv_dir:
+        return (True, srv_dir[s]["service_name"], srv_dir[s]["category"])
     if s.startswith("1800"):
         return (True, "Toll-Free 1800 Customer Helpline", "Toll-Free Helpline")
     if s.startswith("1860"):
@@ -212,10 +183,11 @@ def lookup_tac_device(imei: str) -> dict:
         "Google": "United States (Mountain View, CA)",
     }
 
-    if tac in TAC_DATABASE:
-        data = TAC_DATABASE[tac]
+    tac_db = load_tac_database()
+    if tac in tac_db:
+        data = tac_db[tac]
         b = data["brand"]
-        origin = origin_map.get(b, "Global / GSMA Member State")
+        origin = data.get("origin") or origin_map.get(b, "Global / GSMA Member State")
         return {
             "imei": imei,
             "tac": tac,
@@ -223,7 +195,7 @@ def lookup_tac_device(imei: str) -> dict:
             "model": data["model"],
             "marketing_name": f"{b} {data['model']}",
             "generation": data["generation"],
-            "device_type": data["device_type"],
+            "device_type": data.get("device_type", "Smartphone"),
             "manufacturer": data["manufacturer"],
             "mfr": data["manufacturer"],
             "origin": origin,

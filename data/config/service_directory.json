@@ -1,0 +1,18 @@
+{
+  "1800112211": {"service_name": "State Bank of India (SBI) Helpline", "category": "Banking / Financial"},
+  "18602662666": {"service_name": "HDFC PhoneBanking Gateway", "category": "Banking / Financial"},
+  "18002584455": {"service_name": "Bank of Baroda Customer Service", "category": "Banking / Financial"},
+  "18001080": {"service_name": "ICICI Bank Helpline", "category": "Banking / Financial"},
+  "18002095555": {"service_name": "Axis Bank Toll-Free", "category": "Banking / Financial"},
+  "18004250018": {"service_name": "Canara Bank Toll-Free", "category": "Banking / Financial"},
+  "18001802222": {"service_name": "Punjab National Bank Toll-Free", "category": "Banking / Financial"},
+  "1930": {"service_name": "National Cyber Crime Reporting Helpline", "category": "Emergency / Law Enforcement"},
+  "112": {"service_name": "National Emergency Response System (ERSS)", "category": "Emergency / Law Enforcement"},
+  "100": {"service_name": "Police Control Room Helpline", "category": "Emergency / Law Enforcement"},
+  "1090": {"service_name": "Women Power Line Helpline", "category": "Emergency / Law Enforcement"},
+  "121": {"service_name": "Telecom Service Provider Customer Care", "category": "Telecom Service"},
+  "198": {"service_name": "Telecom Complaints Resolution Line", "category": "Telecom Service"},
+  "56161": {"service_name": "Banking OTP / Alert Shortcode Gateway", "category": "OTP / Alert Gateway"},
+  "567676": {"service_name": "Transaction Verification Alert Gateway", "category": "OTP / Alert Gateway"},
+  "54321": {"service_name": "Telecom Value Added Services", "category": "Telecom Service"}
+}

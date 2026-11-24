@@ -730,83 +730,6 @@ def download_report(
         )
 
 
-# ----------------- TAC LOOKUP & PHONE MODEL DATABASE -----------------
-KNOWN_TACS = {
-    "35649210": {"brand": "Apple", "model": "iPhone 14 Pro Max", "gen": "5G VoLTE", "mfr": "Foxconn Hon Hai", "origin": "India/China"},
-    "35928111": {"brand": "Apple", "model": "iPhone 15 Pro", "gen": "5G VoLTE", "mfr": "Apple Inc.", "origin": "India/China"},
-    "35298411": {"brand": "Samsung", "model": "Galaxy S23 Ultra", "gen": "5G VoLTE", "mfr": "Samsung Electronics", "origin": "South Korea"},
-    "35789110": {"brand": "Samsung", "model": "Galaxy A54 5G", "gen": "5G VoLTE", "mfr": "Samsung Electronics", "origin": "India/Vietnam"},
-    "86420104": {"brand": "OnePlus", "model": "OnePlus 11 5G", "gen": "5G VoLTE", "mfr": "OnePlus Technology", "origin": "China"},
-    "86754305": {"brand": "Xiaomi", "model": "Redmi Note 12 Pro 5G", "gen": "5G VoLTE", "mfr": "Xiaomi Communications", "origin": "India"},
-    "86392104": {"brand": "Vivo", "model": "Vivo V29 Pro 5G", "gen": "5G VoLTE", "mfr": "Vivo Mobile Comm", "origin": "India"},
-    "86123405": {"brand": "Realme", "model": "Realme 11 Pro+ 5G", "gen": "5G VoLTE", "mfr": "Realme Chongqing Mobile", "origin": "China"},
-    "35894109": {"brand": "Google", "model": "Pixel 7 Pro", "gen": "5G VoLTE", "mfr": "Google LLC", "origin": "USA/Vietnam"},
-    "35712308": {"brand": "Motorola", "model": "Edge 40 Neo", "gen": "5G VoLTE", "mfr": "Motorola Mobility (Lenovo)", "origin": "China/India"},
-    "35314509": {"brand": "Nokia", "model": "G42 5G", "gen": "5G VoLTE", "mfr": "HMD Global Oy", "origin": "Finland/India"},
-    "86490204": {"brand": "Oppo", "model": "Reno 10 Pro 5G", "gen": "5G VoLTE", "mfr": "Guangdong Oppo Mobile", "origin": "China"},
-    "35489009": {"brand": "Apple", "model": "iPhone 13 128GB", "gen": "5G VoLTE", "mfr": "Apple Inc.", "origin": "India"},
-}
-
-
-def decode_tac_info(imei: str) -> dict:
-    clean = "".join(c for c in imei if c.isdigit())
-    if len(clean) < 8:
-        return {
-            "imei": imei,
-            "tac": clean,
-            "brand": "Unknown Device",
-            "model": "Generic GSM Terminal",
-            "generation": "2G/3G/4G",
-            "mfr": "Unknown",
-            "origin": "Unknown",
-            "luhn_valid": False,
-            "valid_length": False
-        }
-
-    tac = clean[:8]
-    valid_luhn = False
-    if len(clean) >= 14:
-        digits = [int(c) for c in clean[:15]]
-        if len(digits) == 15:
-            checksum = 0
-            for i in range(14):
-                d = digits[i]
-                if i % 2 == 1:
-                    d *= 2
-                    if d > 9:
-                        d = (d // 10) + (d % 10)
-                checksum += d
-            check_digit = (10 - (checksum % 10)) % 10
-            valid_luhn = (check_digit == digits[14])
-        else:
-            valid_luhn = True
-
-    if tac in KNOWN_TACS:
-        data = KNOWN_TACS[tac].copy()
-    else:
-        first2 = tac[:2]
-        if first2 in ("35", "01"):
-            data = {"brand": "Samsung / Apple Device", "model": f"LTE/5G Smartphone (TAC {tac})", "gen": "4G/5G VoLTE", "mfr": "Global OEM", "origin": "India / Multi"}
-        elif first2 == "86":
-            data = {"brand": "BBK / Xiaomi Device", "model": f"VoLTE Handset (TAC {tac})", "gen": "4G/5G VoLTE", "mfr": "Asian Telecom OEM", "origin": "India / China"}
-        elif first2 in ("49", "52"):
-            data = {"brand": "European Telecom Equipment", "model": f"GSM Terminal (TAC {tac})", "gen": "4G LTE", "mfr": "EU Telecom", "origin": "Europe"}
-        else:
-            data = {"brand": "Standard Telecom Mobile", "model": f"GSM Terminal (TAC {tac})", "gen": "4G VoLTE", "mfr": "Certified Telco Manufacturer", "origin": "India"}
-
-    data.update({
-        "imei": clean,
-        "tac": tac,
-        "generation": data.get("gen", "4G VoLTE"),
-        "fac": clean[6:8] if len(clean) >= 8 else "",
-        "snr": clean[8:14] if len(clean) >= 14 else "",
-        "cd": clean[14] if len(clean) >= 15 else "",
-        "luhn_valid": valid_luhn,
-        "valid_length": len(clean) in (14, 15, 16)
-    })
-    return data
-
-
 # ----------------- TAC LOOKUP -----------------
 @app.get("/api/tac/{imei}")
 def get_tac_info(
@@ -1376,7 +1299,7 @@ def get_case_analytics(
     # 7. IMEI Summary with TAC
     imei_summary = []
     for im, st in imei_stats.items():
-        tac_data = decode_tac_info(im)
+        tac_data = lookup_tac_device(im)
         imei_summary.append({
             "imei": im,
             "brand": tac_data["brand"],
