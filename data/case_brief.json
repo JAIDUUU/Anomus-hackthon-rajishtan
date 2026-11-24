@@ -1,0 +1,59 @@
+{
+  "case_id": "CASE-RAJ-2026-0042",
+  "title": "Operation Maru-Drishti (Cyber Fraud & Syndicate Analysis)",
+  "jurisdiction": "Rajasthan State Cyber Crime Police Station, Jaipur",
+  "investigation_period": "2026-11-15 to 2026-11-23",
+  "suspects": [
+    {
+      "id": "S1",
+      "phone": "9829022222",
+      "name": "Vikram Singh",
+      "role": "Syndicate Field Operative",
+      "imei": "354890123456781"
+    },
+    {
+      "id": "S2",
+      "phone": "9829033333",
+      "name": "Rajesh Meena",
+      "role": "Logistics Coordinator",
+      "imei": "354890123456782"
+    },
+    {
+      "id": "S3",
+      "phone": "9829044444",
+      "new_phone": "9829077777",
+      "name": "Amit Rathore",
+      "role": "Tech Operator (SIM Swapper)",
+      "imei": "354890123456783"
+    },
+    {
+      "id": "S4",
+      "phone": "9829055555",
+      "name": "Farooq Khan",
+      "role": "Night Operations Handler",
+      "imei": "354890123456784"
+    },
+    {
+      "id": "KP",
+      "phone": "9829011111",
+      "name": "Mastermind KP",
+      "role": "Central Controller"
+    }
+  ],
+  "key_ground_truths": {
+    "kingpin_link": "9829011111 (Kingpin) has direct communication with all 4 suspects (S1, S2, S3, S4).",
+    "common_contacts": "S1 (9829022222) and S2 (9829033333) both communicate with common numbers 9414088888 and 9414099999.",
+    "sim_swap_imei_reuse": "Suspect S3 used IMEI 354890123456783 with 9829044444 until 2026-11-19, then switched to 9829077777 on same handset.",
+    "night_activity": "Suspect S4 (9829055555) has concentrated communication between 22:00 and 05:00 hours.",
+    "physical_meeting": {
+      "tower": "RAJ-JPR-102 (Jaipur - MI Road)",
+      "date": "2026-11-20",
+      "time_window": "18:15:00 to 18:45:00",
+      "participants": [
+        "9829022222 (S1)",
+        "9829033333 (S2)"
+      ]
+    },
+    "ipdr_ground_truth": "Subscriber 9829022222 (S1) generated session on 2026-11-20 18:25:10 from IP 103.211.54.12:44321 to Telegram server."
+  }
+}
