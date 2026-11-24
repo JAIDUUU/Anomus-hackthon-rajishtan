@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rajasthan Police - Cyber Forensic Command Center v5.2.0 (PS03)</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/style.css">
+  
+  <!-- Leaflet Map CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <!-- Cytoscape Network Graph -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+  <!-- ================= TOP HEADER BAR ================= -->
+  <header class="top-header">
+    <div class="brand-section">
+      <div class="police-shield-badge">RP</div>
+      <div class="brand-titles">
+        <h1>
+          RAJASTHAN POLICE - CYBER FORENSIC SUITE
+          <span class="badge-ver">v5.2.0</span>
+        </h1>
+        <p>Investigation Command Center &bull; CDR / IPDR Telecom Intelligence (PS03)</p>
+      </div>
+    </div>
+
+    <!-- Header Middle: Global Search & Real-time Live Clock -->
+    <div class="header-middle">
+      <div class="global-search-wrapper">
+        <input 
+          type="text" 
+          id="global-search-input" 
+          class="global-search-input" 
+          placeholder="Global search (Number, IMEI, Tower, IP)... [Enter]"
+          onkeydown="handleSearchKey(event)"
+        >
+        <span class="global-search-icon">🔍</span>
+      </div>
+
+      <div class="live-clock-pill">
+        <span class="pulse-dot"></span>
+        <span id="live-clock-display">24-Nov-2026 20:45:00 IST</span>
+      </div>
+    </div>
+
+    <!-- Header Right Actions: 1-Click Demo, Notifications, Profile, Role Switch -->
+    <div class="header-actions">
+      <button id="btn-load-demo" class="btn btn-gold" onclick="loadDemoCase()">
+        ⚡ Load Demo Case
+      </button>
+
+      <button id="btn-notifs" class="notif-bell-btn" title="System Alerts & Notifications" onclick="toggleNotifsModal()">
+        🔔
+        <span id="notif-badge" class="notif-count-badge">3</span>
+      </button>
+
+      <div class="user-profile-chip" id="user-profile-badge">
+        <div class="user-avatar-circle">IN</div>
+        <div class="user-info-text">
+          <span id="header-user-name" class="user-info-name">IN Investigator</span>
+          <span id="header-user-role" class="user-info-role">IO / Analyst</span>
+        </div>
+      </div>
+
+      <select id="quick-role-switch" class="form-control" style="width: 140px; padding: 4px; font-size: 11.5px;" onchange="switchRole(this.value)">
+        <option value="io_sharma">IO Ajay Sharma</option>
+        <option value="sp_verma">SP Verma (Senior)</option>
+        <option value="admin">ACP Meena (Admin)</option>
+      </select>
+
+      <button class="btn btn-outline btn-sm" onclick="showLoginModal()">Login</button>
+    </div>
+  </header>
+
+  <!-- ================= ACTIVE CASE SUBHEADER BAR ================= -->
+  <div class="case-bar">
+    <div class="case-bar-left">
+      <span class="case-bar-tag">ACTIVE CASE:</span>
+      <select id="case-selector" class="case-select-box" onchange="changeActiveCase(this.value)">
+        <option value="">-- No Case Selected --</option>
+      </select>
+      <button class="btn btn-outline btn-sm" onclick="openNewCaseModal()">+ Register FIR</button>
+      <button class="btn btn-outline btn-sm" onclick="openAllCasesModal()">📁 Cases Directory</button>
+    </div>
+    <div id="case-stats-summary" style="font-size: 12px; color: var(--text-secondary);">
+      Total CDR: <b id="stat-hdr-cdr" style="color: #38bdf8;">0</b> | 
+      Total IPDR: <b id="stat-hdr-ipdr" style="color: #38bdf8;">0</b> |
+      Suspects: <b id="stat-hdr-suspects" style="color: #f59e0b;">0</b>
+    </div>
+  </div>
+
+  <!-- ================= APP WORKSPACE (SIDEBAR + MAIN VIEWS) ================= -->
+  <div class="app-layout">
+    
+    <!-- LEFT SIDEBAR WITH 25+ FORENSIC MODULES -->
+    <aside class="app-sidebar">
+      <div class="sidebar-group-title">COMMAND &amp; OVERVIEW</div>
+      <button class="sidebar-nav-btn active" onclick="switchView('dashboard')">
+        <span class="nav-icon">🎛️</span>
+        <span>Executive Dashboard</span>
+        <span class="nav-badge">Core</span>
+      </button>
+
+      <div class="sidebar-group-title">TELECOM INTELLIGENCE</div>
+      <button class="sidebar-nav-btn" onclick="switchView('raw-cdr')">
+        <span class="nav-icon">📑</span>
+        <span>Raw CDR Data</span>
+        <span class="nav-badge" id="badge-cdr-count">0</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('mfc')">
+        <span class="nav-icon">📊</span>
+        <span>MFC Analysis</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('first-last')">
+        <span class="nav-icon">⏱️</span>
+        <span>First / Last Call</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('day-night')">
+        <span class="nav-icon">🌓</span>
+        <span>Day / Night Analysis</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('missing-dates')">
+        <span class="nav-icon">📅</span>
+        <span>Missing Dates / Gaps</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('service-numbers')">
+        <span class="nav-icon">🏢</span>
+        <span>Service &amp; Shortcodes</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('international')">
+        <span class="nav-icon">🌍</span>
+        <span>International Intel</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('advanced-cdr')">
+        <span class="nav-icon">🔎</span>
+        <span>Advanced CDR Query</span>
+      </button>
+
+      <div class="sidebar-group-title">NETWORK &amp; CORRELATION</div>
+      <button class="sidebar-nav-btn" onclick="switchView('graph')">
+        <span class="nav-icon">🕸️</span>
+        <span>Graph Analytics</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('common-numbers')">
+        <span class="nav-icon">🔗</span>
+        <span>Common Numbers</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('meetings')">
+        <span class="nav-icon">🚨</span>
+        <span>Meeting Rendezvous</span>
+      </button>
+
+      <div class="sidebar-group-title">HARDWARE &amp; IDENTITY</div>
+      <button class="sidebar-nav-btn" onclick="switchView('imei-summary')">
+        <span class="nav-icon">📱</span>
+        <span>IMEI Summary &amp; TAC</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('imsi-summary')">
+        <span class="nav-icon">💳</span>
+        <span>IMSI Summary</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('device-changes')">
+        <span class="nav-icon">🔄</span>
+        <span>SIM Swaps &amp; Hopping</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('ownership')">
+        <span class="nav-icon">👤</span>
+        <span>Ownership &amp; CAF Dossiers</span>
+      </button>
+
+      <div class="sidebar-group-title">GEO &amp; CYBER INTEL</div>
+      <button class="sidebar-nav-btn" onclick="switchView('geo-map')">
+        <span class="nav-icon">📍</span>
+        <span>Geo Intelligence &amp; Map</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('movement')">
+        <span class="nav-icon">🚀</span>
+        <span>Movement &amp; Cell Changes</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('day-locations')">
+        <span class="nav-icon">☀️</span>
+        <span>Day Locations</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('night-locations')">
+        <span class="nav-icon">🌙</span>
+        <span>Night Locations</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('ipdr')">
+        <span class="nav-icon">🌐</span>
+        <span>IPDR Analysis</span>
+      </button>
+
+      <div class="sidebar-group-title">INVESTIGATION &amp; COMPLIANCE</div>
+      <button class="sidebar-nav-btn" onclick="switchView('assistant')">
+        <span class="nav-icon">🤖</span>
+        <span>AI Assistant Chat</span>
+        <span class="nav-badge" style="background:#0284c7;color:#fff;">AI</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('reports')">
+        <span class="nav-icon">📄</span>
+        <span>Reports &amp; Downloads</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('import')">
+        <span class="nav-icon">📂</span>
+        <span>Data Ingestion &amp; Mapping</span>
+      </button>
+      <button class="sidebar-nav-btn" id="audit-nav-btn" onclick="switchView('audit')">
+        <span class="nav-icon">🛡️</span>
+        <span>Section 65B Audit Log</span>
+      </button>
+    </aside>
+
+    <!-- MAIN FORENSIC DISPLAY PANEL -->
+    <main class="app-content">
+
+      <!-- ================= MODULE 1: EXECUTIVE DASHBOARD ================= -->
+      <section id="view-dashboard" class="module-view active">
+        
+        <!-- EXECUTIVE 8-CARD METRIC GRID -->
+        <div class="metric-grid-8" id="executive-metric-grid">
+          <div class="metric-card">
+            <div class="metric-card-header">
+              <span class="metric-card-title">Total Cases</span>
+              <span class="metric-card-icon">📁</span>
+            </div>
+            <div class="metric-card-val" id="metric-total-cases">-</div>
+            <div class="metric-card-footer">
+              <span class="metric-card-badge badge-blue">Registered FIRs</span>
+              <span style="color: var(--text-muted);">State Cyber Cell</span>
+            </div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-card-header">
+              <span class="metric-card-title">Pending Cases</span>
+              <span class="metric-card-icon">⏳</span>
+            </div>
+            <div class="metric-card-val" id="metric-pending-cases" style="color: #f59e0b;">-</div>
+            <div class="metric-card-footer">
+              <span class="metric-card-badge badge-amber">Under Scrutiny</span>
+              <span style="color: var(--text-muted);">In Progress</span>
+            </div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-card-header">
+              <span class="metric-card-title">Completed Cases</span>
+              <span class="metric-card-icon">✅</span>
+            </div>
+            <div class="metric-card-val" id="metric-completed-cases" style="color: #10b981;">-</div>
+            <div class="metric-card-footer">
+              <span class="metric-card-badge badge-green">Chargesheeted</span>
+              <span style="color: var(--text-muted);">Court Ready</span>
+            </div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-card-header">
+              <span class="metric-card-title">Active Investigations</span>
+              <span class="metric-card-icon">🔍</span>
+            </div>
+            <div class="metric-card-val" id="metric-active-cases" style="color: #38bdf8;">-</div>
+            <div class="metric-card-footer">
+              <span class="metric-card-badge badge-blue">Live IO Ops</span>
+              <span style="color: var(--text-muted);">Assigned IOs</span>
+            </div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-card-header">
+              <span class="metric-card-title">Total Uploaded CDRs</span>
+              <span class="metric-card-icon">📞</span>
+            </div>
+            <div class="metric-card-val" id="metric-total-cdrs">-</div>
+            <div class="metric-card-footer">
+              <span class="metric-card-badge badge-blue">Normalized Rows</span>
+              <span style="color: var(--text-muted);">Telco Feeds</span>
+            </div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-card-header">
+              <span class="metric-card-title">Analyzed Numbers</span>
+              <span class="metric-card-icon">👥</span>
+            </div>
+            <div class="metric-card-val" id="metric-analyzed-numbers">-</div>
+            <div class="metric-card-footer">
+              <span class="metric-card-badge badge-purple">Subscribers</span>
+              <span style="color: var(--text-muted);">A &amp; B Parties</span>
+            </div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-card-header">
+              <span class="metric-card-title">Common Numbers</span>
+              <span class="metric-card-icon">🔗</span>
+            </div>
+            <div class="metric-card-val" id="metric-common-numbers" style="color: #f59e0b;">-</div>
+            <div class="metric-card-footer">
+              <span class="metric-card-badge badge-amber">Syndicate Links</span>
+              <span style="color: var(--text-muted);">&ge; 2 Targets</span>
+            </div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-card-header">
+              <span class="metric-card-title">Locations Tracked</span>
+              <span class="metric-card-icon">📡</span>
+            </div>
+            <div class="metric-card-val" id="metric-locations-tracked" style="color: #10b981;">-</div>
+            <div class="metric-card-footer">
+              <span class="metric-card-badge badge-green">Cell Towers</span>
+              <span style="color: var(--text-muted);">Rajasthan Circle</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- QUICK ACTION CARDS (3 CARDS) -->
+        <div class="quick-actions-row">
+          <div class="quick-action-card" onclick="openTacLookupModal()">
+            <div class="quick-action-icon icon-imei">📱</div>
+            <div class="quick-action-text">
+              <h4>IMEI Info (TAC Device Lookup)</h4>
+              <p>Resolve 15-digit IMEI to Brand, Model, Generation &amp; Luhn checksum.</p>
+            </div>
+          </div>
+
+          <div class="quick-action-card" onclick="openNewCaseModal()">
+            <div class="quick-action-icon icon-newcase">📝</div>
+            <div class="quick-action-text">
+              <h4>Add New Case (FIR Registration)</h4>
+              <p>Register FIR with case brief, target numbers &amp; assigned officer.</p>
+            </div>
+          </div>
+
+          <div class="quick-action-card" onclick="openAllCasesModal()">
+            <div class="quick-action-icon icon-allcases">📁</div>
+            <div class="quick-action-text">
+              <h4>View All Cases (Directory)</h4>
+              <p>Inspect active cases, data records, status &amp; switch active case.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ACTIVE CASE SUMMARY & QUICK ANALYTICS -->
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">📋 Case Executive Brief</div>
+              <span class="badge-verified" id="dash-case-status">ACTIVE</span>
+            </div>
+            <h3 id="dash-case-title" style="color: #38bdf8; font-size: 15px; margin-bottom: 6px;">Loading Case...</h3>
+            <p id="dash-case-desc" style="color: var(--text-secondary); font-size: 12.5px; line-height: 1.6; margin-bottom: 12px;">
+              Please select a case or click "Load Demo Case".
+            </p>
+            
+            <div style="font-size: 12px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">Target Suspects in Syndicate:</div>
+            <div id="dash-suspects-chips" style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <span style="color: var(--text-muted); font-size: 12px;">Loading suspects...</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">📊 Communication Distribution</div>
+              <span style="font-size: 11px; color: var(--text-muted);">Call Types &amp; Night Split</span>
+            </div>
+            <div style="height: 200px; display: flex; align-items: center; justify-content: center;">
+              <canvas id="chart-dash-distribution"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= MODULE 2: RAW CDR DATA ================= -->
+      <section id="view-raw-cdr" class="module-view">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📑 Raw Call Detail Records (Paginated &amp; Normalized)</div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <input type="text" id="cdr-filter-search" class="form-control" style="width: 220px;" placeholder="Search Phone / IMEI / Tower..." oninput="debounceCdrSearch()">
+              <select id="cdr-filter-type" class="form-control" style="width: 100px;" onchange="loadRawCdrPage(1)">
+                <option value="">All Types</option>
+                <option value="OUT">OUT</option>
+                <option value="IN">IN</option>
+                <option value="SMS">SMS</option>
+              </select>
+              <button class="btn btn-outline btn-sm" onclick="exportCdrCsv()">📥 Export CSV</button>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <table id="raw-cdr-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Timestamp (ISO)</th>
+                  <th>A-Number (Caller)</th>
+                  <th>B-Number (Receiver)</th>
+                  <th>Type</th>
+                  <th>Duration (s)</th>
+                  <th>Cell Tower &amp; Area</th>
+                  <th>IMEI</th>
+                  <th>IMSI</th>
+                  <th>Evidence</th>
+                </tr>
+              </thead>
+              <tbody id="raw-cdr-tbody">
+                <tr><td colspan="10" style="text-align:center; color: var(--text-muted);">Loading raw CDR records...</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination Controls -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px;">
+            <span style="font-size: 12px; color: var(--text-secondary);" id="cdr-pagination-info">Showing 0-0 of 0</span>
+            <div style="display: flex; gap: 6px;">
+              <button class="btn btn-outline btn-sm" id="btn-cdr-prev" onclick="changeCdrPage(-1)">◀ Prev</button>
+              <button class="btn btn-outline btn-sm" id="btn-cdr-next" onclick="changeCdrPage(1)">Next ▶</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= MODULE 3: MFC ANALYSIS ================= -->
+      <section id="view-mfc" class="module-view">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">📊 Top Frequent Contacts (MFC)</div>
+              <span style="font-size: 11px; color: var(--text-muted);">Sorted by Call Volume</span>
+            </div>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Contact Number</th>
+                    <th>Calls</th>
+                    <th>Total Dur (s)</th>
+                    <th>IN / OUT / SMS</th>
+                    <th>Vol %</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="mfc-table-body">
+                  <tr><td colspan="7" style="text-align:center; color: var(--text-muted);">Loading MFC data...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">📈 MFC Call Volume Chart</div>
+            </div>
+            <div style="height: 380px;">
+              <canvas id="chart-mfc"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= MODULE 4: GRAPH ANALYTICS ================= -->
+      <section id="view-graph" class="module-view">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🕸️ Suspect Communication Network Topology (Cytoscape)</div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <label style="font-size: 11.5px; color: var(--text-secondary);">Min Calls: <b id="min-calls-display" style="color: #38bdf8;">1</b></label>
+              <input type="range" id="min-calls-slider" min="1" max="25" value="1" oninput="updateNetworkSlider(this.value)">
+              <button class="btn btn-outline btn-sm" onclick="loadNetworkGraph()">Redraw Graph</button>
+              <button class="btn btn-gold btn-sm" onclick="explainNetworkWithAI()">🤖 AI Explain Graph</button>
+            </div>
+          </div>
+          <div id="network-container"></div>
+          <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 12px; color: var(--text-muted);">
+            <span>🔴 Suspect Nodes | 🔵 Associate / Common Nodes | Edge Width = Call Volume | Node Size = Degree</span>
+            <span id="network-stats-label">Loading network topology...</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= MODULE 5: FIRST / LAST CALL ================= -->
+      <section id="view-first-last" class="module-view">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">⏱️ First &amp; Last Call Timeline per Contact</div>
+            <span style="font-size: 11px; color: var(--text-muted);">Active span of association</span>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Phone Number</th>
+                  <th>First Call Timestamp</th>
+                  <th>Last Call Timestamp</th>
+                  <th>Days Active Span</th>
+                  <th>Total Calls</th>
+                  <th>Avg Duration (s)</th>
+                </tr>
+              </thead>
+              <tbody id="first-last-table-body">
+                <tr><td colspan="6" style="text-align:center; color: var(--text-muted);">Loading first/last call analytics...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= MODULE 6: DAY / NIGHT ANALYSIS ================= -->
+      <section id="view-day-night" class="module-view">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">🌓 Day (06:00-22:00) vs Night (22:00-06:00) Split</div>
+            </div>
+            <div style="height: 240px; display: flex; align-items: center; justify-content: center;">
+              <canvas id="chart-day-night"></canvas>
+            </div>
+            <div style="display: flex; justify-content: space-around; margin-top: 16px; font-size: 13px;">
+              <div>Day Calls: <b id="stat-day-calls" style="color: #38bdf8;">0</b> (<span id="stat-day-pct">0%</span>)</div>
+              <div>Night Calls: <b id="stat-night-calls" style="color: #f59e0b;">0</b> (<span id="stat-night-pct">0%</span>)</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">⚠️ Night Activity Suspects (22:00 - 06:00)</div>
+              <span style="font-size: 11px; color: #fca5a5;">High Night Ratio Anomalies</span>
+            </div>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Number</th>
+                    <th>Night Calls</th>
+                    <th>Total Calls</th>
+                    <th>Night Ratio</th>
+                  </tr>
+                </thead>
+                <tbody id="night-numbers-tbody">
+                  <tr><td colspan="4" style="text-align:center; color: var(--text-muted);">Loading night suspects...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= MODULE 7: MISSING DATES / GAPS ================= -->
+      <section id="view-missing-dates" class="module-view">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📅 Silence Gaps &amp; Missing Dates (0-Activity Days)</div>
+            <span style="font-size: 11px; color: var(--text-muted);">Calendar timeline between first &amp; last call</span>
+          </div>
+          <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 12px;">
+            Detects operational secrecy pauses, handset shutdowns, or travel across borders when zero communication occurred.
+          </p>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Silence Date</th>
+                  <th>Day of Week</th>
+                  <th>Anomaly Status</th>
+                  <th>Investigative Notes</th>
+                </tr>
+              </thead>
+              <tbody id="missing-dates-tbody">
+                <tr><td colspan="4" style="text-align:center; color: var(--text-muted);">Loading missing dates...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= MODULE 8: MOVEMENT & CELL CHANGES ================= -->
+      <section id="view-movement" class="module-view">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🚀 Handset Movement &amp; Cell Tower Transitions</div>
+            <span style="font-size: 11px; color: var(--text-muted);">Chronological sequence hops</span>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Hop #</th>
+                  <th>Timestamp</th>
+                  <th>Cell Tower ID</th>
+                  <th>Area / Location</th>
+                  <th>Suspect Number</th>
+                  <th>Time Delta (s)</th>
+                  <th>Speed / Transition</th>
+                </tr>
+              </thead>
+              <tbody id="movement-tbody">
+                <tr><td colspan="7" style="text-align:center; color: var(--text-muted);">Loading movement hops...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= MODULE 9: SERVICE & SHORTCODES ================= -->
+      <section id="view-service-numbers" class="module-view">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🏢 Service Numbers, Toll-Free &amp; Bank OTP Lines</div>
+            <span style="font-size: 11px; color: var(--text-muted);">1800/1860 &amp; Shortcodes</span>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Dialed Number</th>
+                  <th>Category</th>
+                  <th>Call Volume</th>
+                  <th>First Seen</th>
+                  <th>Last Seen</th>
+                </tr>
+              </thead>
+              <tbody id="service-numbers-tbody">
+                <tr><td colspan="5" style="text-align:center; color: var(--text-muted);">Loading service numbers...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= MODULE 10: INTERNATIONAL INTEL ================= -->
+      <section id="view-international" class="module-view">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🌍 International Communication Intelligence</div>
+            <span style="font-size: 11px; color: var(--text-muted);">Non-+91 Foreign Call Links</span>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>International Number</th>
+                  <th>Country Code</th>
+                  <th>Call Count</th>
+                  <th>First Seen</th>
+                  <th>Last Seen</th>
+                </tr>
+              </thead>
+              <tbody id="international-tbody">
+                <tr><td colspan="5" style="text-align:center; color: var(--text-muted);">Loading international records...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= MODULE 11: ADVANCED CDR QUERY ================= -->
+      <section id="view-advanced-cdr" class="module-view">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🔎 Advanced CDR Filters &amp; Query Engine</div>
+          </div>
+          <div class="grid-3" style="margin-bottom: 14px;">
+            <div class="form-group">
+              <label class="form-label">Filter Phone Number:</label>
+              <input type="text" id="adv-cdr-num" class="form-control" placeholder="Target number...">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Min Duration (Sec):</label>
+              <input type="number" id="adv-cdr-dur" class="form-control" value="0">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Call Type:</label>
+              <select id="adv-cdr-type" class="form-control">
+                <option value="">ALL</option>
+                <option value="OUT">OUTGOING</option>
+                <option value="IN">INCOMING</option>
+                <option value="SMS">SMS</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-police" onclick="runAdvancedCdrFilter()">Execute Query</button>
+        </div>
+      </section>
+
+      <!-- ================= MODULE 12: COMMON NUMBERS ================= -->
+      <section id="view-common-numbers" class="module-view">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🔗 Cross-Suspect Common Numbers Correlation</div>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="common-numbers-input" class="form-control" style="width: 320px;" value="9829022222, 9829033333">
+              <button class="btn btn-police btn-sm" onclick="runCommonAnalysis()">Find Shared Contacts</button>
+            </div>
+          </div>
+          <div id="common-numbers-results">
+            <p style="color: var(--text-muted); font-size: 13px;">Finds numbers dialed by 2 or more selected suspects and direct mutual calls.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= MODULE 13: MEETING RENDEZVOUS ================= -->
+      <section id="view-meetings" class="module-view">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🚨 "Same Tower, Same Time Window" Meeting Detection</div>
+            <button class="btn btn-police btn-sm" onclick="runMeetingDetection()">Scan Meetings</button>
+          </div>
+          <div style="display: flex; gap: 8px; margin-bottom: 14px;">
+            <input type="text" id="meet-num1" class="form-control" value="9829022222" placeholder="Suspect 1">
+            <input type="text" id="meet-num2" class="form-control" value="9829033333" placeholder="Suspect 2">
+            <select id="meet-window" class="form-control" style="width: 150px;">
+              <option value="30">30 Mins Window</option>
+              <option value="60">60 Mins Window</option>
+              <option value="120">2 Hours Window</option>
+            </select>
+          </div>
+          <div id="meeting-detection-results">
+            <p style="color: var(--text-muted); font-size: 13px;">Click "Scan Meetings" to detect concurrent cell-site presence.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= MODULE 14: IMEI SUMMARY & TAC ================= -->
+      <section id="view-imei-summary" class="module-view">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📱 IMEI Handset Summary &amp; TAC Model Attribution</div>
+            <button class="btn btn-gold btn-sm" onclick="openTacLookupModal()">🔍 Lookup Any IMEI</button>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>IMEI</th>
+                  <th>Brand &amp; Model</th>
+                  <th>Network Tech</th>
+                  <th>Associated Numbers</th>
+                  <th>Associated IMSIs</th>
+                  <th>Total Calls</th>
+                  <th>First Seen</th>
+                  <th>Last Seen</th>
+                </tr>
+              </thead>
+              <tbody id="imei-summary-tbody">
+                <tr><td colspan="8" style="text-align:center; color: var(--text-muted);">Loading IMEI summary...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= MODULE 15: IMSI SUMMARY ================= -->
+      <section id="view-imsi-summary" class="module-view">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">💳 IMSI SIM Card Summary</div>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>IMSI</th>
+                  <th>Linked Phone Numbers</th>
+                  <th>Linked IMEIs</th>
+                  <th>Total Transactions</th>
+                  <th>First Seen</th>
+                  <th>Last Seen</th>
+                </tr>
+              </thead>
+              <tbody id="imsi-summary-tbody">
+                <tr><td colspan="6" style="text-align:center; color: var(--text-muted);">Loading IMSI summary...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= MODULE 16: SIM SWAPS & HOPPING ================= -->
+      <section id="view-device-changes" class="module-view">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🔄 IMEI / SIM Swap Anomaly Detection</div>
+            <button class="btn btn-outline btn-sm" onclick="runDeviceChangeDetection()">Run Scan</button>
+          </div>
+          <div id="device-changes-results">
+            <p style="color: var(--text-muted); font-size: 13px;">Detects handsets (IMEI) shared across multiple SIM cards (IMSI/numbers).</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= MODULE 17: OWNERSHIP & CAF DOSSIERS ================= -->
+      <section id="view-ownership" class="module-view">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">👤 Ownership Intelligence &amp; Subscriber Dossiers</div>
+          </div>
+          <div id="ownership-dossiers-container" class="grid-2">
+            <p style="color: var(--text-muted); font-size: 13px;">Loading suspect dossiers...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= MODULE 18: GEO MAP ================= -->
+      <section id="view-geo-map" class="module-view">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📍 Cell Tower Trajectory Map (Rajasthan Police GIS)</div>
+            <div style="display: flex; gap: 8px;">
+              <select id="map-suspect-select" class="form-control" style="width: 200px;" onchange="renderTowerMap(this.value)">
+                <option value="9829022222">S1 (9829022222)</option>
+                <option value="9829033333">S2 (9829033333)</option>
+                <option value="9829044444">S3 (9829044444)</option>
+                <option value="9829055555">S4 (9829055555)</option>
+              </select>
+              <button class="btn btn-police btn-sm" onclick="renderTowerMap()">Refresh Map</button>
+            </div>
+          </div>
+          <div id="map-container"></div>
+          <div style="margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-size: 12px; color: var(--text-secondary);">Numbered sequence points trace movement of target handset across Rajasthan cell sites.</span>
+            <span id="map-event-count" style="font-size: 12px; color: #38bdf8;">-</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= MODULE 19: DAY LOCATIONS ================= -->
+      <section id="view-day-locations" class="module-view">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">☀️ Daytime Cell Tower Locations (06:00 - 22:00)</div>
+            <span style="font-size: 11px; color: var(--text-muted);">Workplace / Transit Sites</span>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cell Tower ID</th>
+                  <th>Area / Sector Name</th>
+                  <th>Day Visits</th>
+                  <th>Latitude</th>
+                  <th>Longitude</th>
+                </tr>
+              </thead>
+              <tbody id="day-locs-tbody">
+                <tr><td colspan="5" style="text-align:center; color: var(--text-muted);">Loading day locations...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= MODULE 20: NIGHT LOCATIONS ================= -->
+      <section id="view-night-locations" class="module-view">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🌙 Nighttime Cell Tower Locations (22:00 - 06:00)</div>
+            <span style="font-size: 11px; color: #fca5a5;">Residence / Hideout Sites</span>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cell Tower ID</th>
+                  <th>Area / Sector Name</th>
+                  <th>Night Visits</th>
+                  <th>Latitude</th>
+                  <th>Longitude</th>
+                </tr>
+              </thead>
+              <tbody id="night-locs-tbody">
+                <tr><td colspan="5" style="text-align:center; color: var(--text-muted);">Loading night locations...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= MODULE 21: IPDR ANALYSIS ================= -->
+      <section id="view-ipdr" class="module-view">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">🔍 IPDR Session Query (Public IP + Port + Timestamp)</div>
+            </div>
+
+            <form onsubmit="handleIpdrMatch(event)">
+              <div class="form-group">
+                <label class="form-label">Source Public IP:</label>
+                <input type="text" id="ipdr-query-ip" class="form-control" value="103.211.54.12" required>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Source Port:</label>
+                <input type="number" id="ipdr-query-port" class="form-control" value="44321" required>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Timestamp (ISO / Standard):</label>
+                <input type="text" id="ipdr-query-time" class="form-control" value="2026-11-20 18:25:10" required>
+              </div>
+
+              <div style="display: flex; gap: 8px; margin-top: 14px;">
+                <button type="submit" class="btn btn-police">Resolve Subscriber &amp; App</button>
+                <button type="button" class="btn btn-outline" onclick="prefillIpdrTest()">Quick Pre-fill Test Session</button>
+              </div>
+            </form>
+
+            <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+              <div style="font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">
+                Lookup All Sessions by Subscriber Number:
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" id="ipdr-sub-input" class="form-control" value="9829022222">
+                <button class="btn btn-outline btn-sm" onclick="runSubscriberIpdr()">Search</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">📡 Session Resolution Result</div>
+            </div>
+            <div id="ipdr-match-result">
+              <p style="color: var(--text-muted); font-size: 13px;">Execute an IPDR query to inspect carrier NAT session attribution and app protocol hints.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= MODULE 22: AI ASSISTANT CHAT ================= -->
+      <section id="view-assistant" class="module-view">
+        <div class="card" style="padding: 10px 16px; margin-bottom: 12px; background: rgba(30, 58, 138, 0.2); border: 1px solid #1e3a8a;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 12.5px;">
+              🤖 <b>AI Telecom Investigation Assistant (LangGraph + Fallback Engine)</b> &bull; Queries metadata only via dedicated Python tools &bull; English &amp; Hindi/Hinglish supported
+            </div>
+            <span class="role-tag role-senior" id="assistant-role-badge">Verification: SP Verma</span>
+          </div>
+        </div>
+
+        <div class="chat-window">
+          <div class="chat-messages" id="chat-messages-container">
+            <div class="msg-card msg-ai">
+              <div class="ai-header-badge badge-pending">AI observation - officer verification pending</div>
+              <p>
+                Namaste Officer. I am your AI Telecom Investigation Assistant. You can ask me in English or Hindi/Hinglish regarding call frequencies, common contacts, SIM swaps, night activity, or IPDR resolutions.
+              </p>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">
+                Every observation links exact source evidence records (file &amp; row) for Section 65B compliance.
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Prompt Chips -->
+          <div class="chips-container">
+            <span style="font-size: 11px; color: var(--text-muted); align-self: center;">Quick Questions:</span>
+            <button class="chip-btn" onclick="sendQuickPrompt('Who are the top frequent contacts of S1 9829022222?')">Top contacts S1</button>
+            <button class="chip-btn" onclick="sendQuickPrompt('Find common numbers between S1 9829022222 and S2 9829033333')">Common numbers S1 &amp; S2</button>
+            <button class="chip-btn" onclick="sendQuickPrompt('S3 9829044444 ne kab SIM badla ya IMEI reuse kiya?')">S3 SIM swap check (Hindi)</button>
+            <button class="chip-btn" onclick="sendQuickPrompt('Check night activity for S4 9829055555')">S4 night calls</button>
+            <button class="chip-btn" onclick="sendQuickPrompt('Did S1 9829022222 and S2 9829033333 have a physical meeting at any tower?')">Physical meeting</button>
+            <button class="chip-btn" onclick="sendQuickPrompt('Call me kya baat hui aur recording sunao')">Guardrail test (Hindi)</button>
+          </div>
+
+          <form class="chat-input-row" onsubmit="handleChatSubmit(event)">
+            <input type="text" id="chat-input" class="form-control" placeholder="Type question in English or Hindi/Hinglish (e.g. 'sabse zyada call kisko kiya', 'common contacts', 'IPDR search')..." autocomplete="off">
+            <button type="submit" class="btn btn-police" id="btn-chat-send">Send</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- ================= MODULE 23: REPORTS & DOWNLOADS ================= -->
+      <section id="view-reports" class="module-view">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📑 Case Investigation Report Generator</div>
+          </div>
+
+          <div style="background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; color: #fbbf24; padding: 10px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 12.5px;">
+            <b>STATUTORY NOTICE:</b> Draft for officer review - not a final conclusion. The generated report compiles data import summaries, cross-suspect correlations, cell-site timelines, IPDR sessions, and AI observations with their officer verification statuses.
+          </div>
+
+          <p style="color: var(--text-secondary); margin-bottom: 16px;">
+            Reports are generated server-side using <b>ReportLab</b> (for official styled PDF) and <b>openpyxl</b> (for complete Excel workbooks with multiple audit sheets).
+          </p>
+
+          <div style="display: flex; gap: 14px;">
+            <button class="btn btn-gold" onclick="downloadCaseReport('pdf')">
+              📥 Download Formal PDF Report
+            </button>
+            <button class="btn btn-outline" onclick="downloadCaseReport('xlsx')">
+              📊 Download Excel Workbook (.xlsx)
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= MODULE 24: DATA INGESTION & MAPPING ================= -->
+      <section id="view-import" class="module-view">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">📤 Upload CDR / IPDR Files</div>
+              <span class="role-tag role-io">Investigating Officer</span>
+            </div>
+
+            <form id="upload-form" onsubmit="handleFileUpload(event)">
+              <div class="form-group">
+                <label class="form-label">Data File Type:</label>
+                <select id="upload-file-type" class="form-control" onchange="updateMappingOptions()">
+                  <option value="CDR">CDR (Call Detail Records)</option>
+                  <option value="IPDR">IPDR (Internet Protocol Detail Records)</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Operator Column Mapping Format:</label>
+                <select id="upload-mapping-select" class="form-control">
+                  <option value="operator_a">Operator A (Standard CSV, +91, sec)</option>
+                  <option value="operator_b">Operator B (Telco Format 2, mm:ss)</option>
+                  <option value="ipdr_operator_a">Operator A (IPDR Log Format)</option>
+                </select>
+                <small style="color: var(--text-muted); display: block; margin-top: 4px;">
+                  Column mappings are stored in JSON and dynamically normalized to standard schema.
+                </small>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Select CSV File:</label>
+                <input type="file" id="upload-file-input" class="form-control" accept=".csv" required>
+              </div>
+
+              <div style="display: flex; gap: 8px; margin-top: 14px;">
+                <button type="submit" class="btn btn-police">Upload &amp; Ingest</button>
+                <button type="button" class="btn btn-outline" onclick="openMappingEditorModal()">Edit Mapping Config</button>
+              </div>
+            </form>
+
+            <div id="upload-progress-alert" style="margin-top: 14px; display: none;"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">📋 Live Validation &amp; Ingestion Report</div>
+            </div>
+            <div id="validation-report-container">
+              <p style="color: var(--text-muted); font-size: 13px;">Upload a file or click "Load Demo Case" to view the validation breakdown.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📁 Previous Ingestion Batches for Active Case</div>
+            <button class="btn btn-outline btn-sm" onclick="loadCaseBatches()">Refresh</button>
+          </div>
+          <div class="table-container">
+            <table id="batches-table">
+              <thead>
+                <tr>
+                  <th>Batch ID</th>
+                  <th>File Name</th>
+                  <th>Type</th>
+                  <th>Mapping Config</th>
+                  <th>Total Rows</th>
+                  <th>Valid Rows</th>
+                  <th>Rejected Rows</th>
+                  <th>Ingested At</th>
+                </tr>
+              </thead>
+              <tbody id="batches-table-body">
+                <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">No uploads yet</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= MODULE 25: AUDIT LOG (SECTION 65B) ================= -->
+      <section id="view-audit" class="module-view">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🛡️ System Security &amp; Section 65B Audit Log</div>
+            <button class="btn btn-outline btn-sm" onclick="loadAuditLogs()">Refresh Logs</button>
+          </div>
+          <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 12px;">
+            Logs every user login, data upload, pattern query, AI assistant question, evidence inspection, observation verification, and report download with username, role, timestamp, and IP address.
+          </p>
+          <div class="table-container">
+            <table id="audit-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Timestamp (UTC)</th>
+                  <th>Officer / User</th>
+                  <th>Role</th>
+                  <th>Action</th>
+                  <th>Details</th>
+                  <th>IP Address</th>
+                </tr>
+              </thead>
+              <tbody id="audit-table-body">
+                <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Loading audit logs...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ================= MODALS ================= -->
+
+  <!-- MODAL: TAC DEVICE LOOKUP -->
+  <div class="modal-overlay" id="modal-tac">
+    <div class="modal-content" style="max-width: 580px;">
+      <div class="modal-header">
+        <div style="font-weight: 700; color: #f8fafc;">📱 IMEI Info &amp; TAC Device Lookup</div>
+        <button class="btn btn-outline btn-sm" onclick="closeTacModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <form onsubmit="handleTacLookup(event)">
+          <div class="form-group">
+            <label class="form-label">Enter 15-Digit IMEI:</label>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="tac-imei-input" class="form-control" placeholder="e.g. 356492104581294" required>
+              <button type="submit" class="btn btn-police">Lookup TAC</button>
+            </div>
+          </div>
+        </form>
+
+        <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px;">
+          Sample IMEIs from Case:
+          <button class="chip-btn" onclick="lookupTacSample('352841104581294')">iPhone 14 Pro</button>
+          <button class="chip-btn" onclick="lookupTacSample('355832119832043')">Galaxy S23</button>
+          <button class="chip-btn" onclick="lookupTacSample('358910000001329')">OnePlus 12</button>
+          <button class="chip-btn" onclick="lookupTacSample('864985048123902')">Redmi Note 12</button>
+        </div>
+
+        <div id="tac-result-card" style="display: none; background: #0d172c; border: 1px solid #1e293b; border-radius: 6px; padding: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h4 id="tac-res-model" style="color: #38bdf8; font-size: 15px;">-</h4>
+            <span id="tac-res-luhn" class="badge-verified">Luhn Valid</span>
+          </div>
+          <div class="grid-2" style="font-size: 12.5px; line-height: 1.8;">
+            <div><b>Brand:</b> <span id="tac-res-brand" style="color:#f8fafc;">-</span></div>
+            <div><b>Generation:</b> <span id="tac-res-gen" style="color:#f8fafc;">-</span></div>
+            <div><b>TAC Code:</b> <span id="tac-res-code" style="color:#fbbf24; font-family:monospace;">-</span></div>
+            <div><b>Manufacturer:</b> <span id="tac-res-mfr" style="color:#f8fafc;">-</span></div>
+            <div><b>Origin:</b> <span id="tac-res-origin" style="color:#f8fafc;">-</span></div>
+            <div><b>Validated IMEI:</b> <span id="tac-res-imei" style="font-family:monospace; color:#38bdf8;">-</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeTacModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD NEW CASE (FIR REGISTRATION) -->
+  <div class="modal-overlay" id="modal-new-case">
+    <div class="modal-content" style="max-width: 550px;">
+      <div class="modal-header">
+        <div style="font-weight: 700; color: #f8fafc;">📝 Register New FIR / Case</div>
+        <button class="btn btn-outline btn-sm" onclick="closeNewCaseModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <form onsubmit="handleCreateCase(event)">
+          <div class="form-group">
+            <label class="form-label">FIR / Case ID:</label>
+            <input type="text" id="newcase-id" class="form-control" placeholder="e.g. FIR-RAJ-2026-0099" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Case Title:</label>
+            <input type="text" id="newcase-title" class="form-control" placeholder="e.g. Operation Hawk-Eye (SIM Syndicate)" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Case Description &amp; Target Suspect Numbers:</label>
+            <textarea id="newcase-desc" class="form-control" rows="4" placeholder="Brief case narrative and initial target suspect numbers..."></textarea>
+          </div>
+          <div style="margin-top: 16px; display: flex; justify-content: flex-end; gap: 8px;">
+            <button type="button" class="btn btn-outline" onclick="closeNewCaseModal()">Cancel</button>
+            <button type="submit" class="btn btn-police">Register FIR</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ALL CASES DIRECTORY -->
+  <div class="modal-overlay" id="modal-all-cases">
+    <div class="modal-content" style="max-width: 760px;">
+      <div class="modal-header">
+        <div style="font-weight: 700; color: #f8fafc;">📁 Case Investigation Directory</div>
+        <button class="btn btn-outline btn-sm" onclick="closeAllCasesModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Case ID</th>
+                <th>Title</th>
+                <th>Status</th>
+                <th>CDR Rows</th>
+                <th>IPDR Rows</th>
+                <th>Created By</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="all-cases-tbody">
+              <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Loading cases...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeAllCasesModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: EVIDENCE RECORD VIEWER (SECTION 65B) -->
+  <div class="modal-overlay" id="evidence-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div style="font-weight: 700; color: #f8fafc;" id="evidence-modal-title">Evidence Source Record</div>
+        <button class="btn btn-outline btn-sm" onclick="closeEvidenceModal()">✕</button>
+      </div>
+      <div class="modal-body" id="evidence-modal-body">
+        <p>Loading raw evidence record...</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeEvidenceModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: VERIFY AI OBSERVATION -->
+  <div class="modal-overlay" id="verify-modal">
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header">
+        <div style="font-weight: 700; color: #f8fafc;">Verify AI Investigation Observation</div>
+        <button class="btn btn-outline btn-sm" onclick="closeVerifyModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="verify-obs-id">
+        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">
+          As a Senior Supervisory Officer, verify or reject this computer-generated analytical lead.
+        </p>
+        <div class="form-group">
+          <label class="form-label">Supervisory Officer Notes:</label>
+          <textarea id="verify-notes-input" class="form-control" rows="3" placeholder="Enter verification notes or statutory directives..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger" onclick="submitObservationVerification('reject')">Reject Observation</button>
+        <button class="btn btn-success" onclick="submitObservationVerification('verify')">Verify &amp; Endorse</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: MAPPING CONFIG EDITOR -->
+  <div class="modal-overlay" id="mapping-editor-modal">
+    <div class="modal-content" style="max-width: 700px;">
+      <div class="modal-header">
+        <div style="font-weight: 700; color: #f8fafc;">Operator Mapping JSON Configuration</div>
+        <button class="btn btn-outline btn-sm" onclick="closeMappingEditorModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Mapping Name / ID:</label>
+          <input type="text" id="mapping-id-input" class="form-control" value="custom_operator">
+        </div>
+        <div class="form-group">
+          <label class="form-label">JSON Mapping Definition:</label>
+          <textarea id="mapping-json-input" class="form-control" rows="12" style="font-family: monospace; font-size: 12px;"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeMappingEditorModal()">Cancel</button>
+        <button class="btn btn-police" onclick="saveCustomMapping()">Save Mapping</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: GLOBAL SEARCH RESULTS -->
+  <div class="modal-overlay" id="modal-search">
+    <div class="modal-content" style="max-width: 800px;">
+      <div class="modal-header">
+        <div style="font-weight: 700; color: #f8fafc;" id="search-modal-title">🔍 Global Search Results</div>
+        <button class="btn btn-outline btn-sm" onclick="closeSearchModal()">✕</button>
+      </div>
+      <div class="modal-body" id="search-modal-body">
+        <p style="color: var(--text-muted);">Enter query in search box...</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeSearchModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: NOTIFICATIONS DRAWER -->
+  <div class="modal-overlay" id="modal-notifs">
+    <div class="modal-content" style="max-width: 480px;">
+      <div class="modal-header">
+        <div style="font-weight: 700; color: #f8fafc;">🔔 System Alerts &amp; Forensic Notifications</div>
+        <button class="btn btn-outline btn-sm" onclick="toggleNotifsModal()">✕</button>
+      </div>
+      <div class="modal-body" id="notifs-container">
+        <div style="padding: 10px; background: #0d172c; border-left: 3px solid #ef4444; border-radius: 4px; margin-bottom: 8px;">
+          <b style="color: #fca5a5;">🚨 SIM Swap Detected</b>
+          <p style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">IMEI 356492104581294 swapped between 9829044444 and 9829077777.</p>
+          <small style="color: var(--text-muted);">15 mins ago &bull; Target S3</small>
+        </div>
+        <div style="padding: 10px; background: #0d172c; border-left: 3px solid #f59e0b; border-radius: 4px; margin-bottom: 8px;">
+          <b style="color: #fbbf24;">📍 Meeting Rendezvous Alert</b>
+          <p style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">S1 (9829022222) and S2 (9829033333) co-located at M.I. Road Tower within 12 mins.</p>
+          <small style="color: var(--text-muted);">32 mins ago &bull; Tower RAJ-JPR-002</small>
+        </div>
+        <div style="padding: 10px; background: #0d172c; border-left: 3px solid #10b981; border-radius: 4px;">
+          <b style="color: #34d399;">✅ Data Feed Ingested</b>
+          <p style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">Synthetic CDRs Operator A &amp; B verified and indexed successfully.</p>
+          <small style="color: var(--text-muted);">1 hour ago &bull; 240 rows</small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="toggleNotifsModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: LOGIN -->
+  <div class="modal-overlay" id="login-modal">
+    <div class="modal-content" style="max-width: 420px;">
+      <div class="modal-header">
+        <div style="font-weight: 700; color: #f8fafc;">Officer Authentication</div>
+        <button class="btn btn-outline btn-sm" onclick="closeLoginModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <form onsubmit="handleManualLogin(event)">
+          <div class="form-group">
+            <label class="form-label">Username:</label>
+            <input type="text" id="login-username" class="form-control" value="io_sharma" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password:</label>
+            <input type="password" id="login-password" class="form-control" value="IO@RajPolice2026" required>
+          </div>
+          <div style="margin-top: 10px; font-size: 11px; color: var(--text-muted);">
+            Demo logins:<br>
+            - <code>io_sharma</code> / <code>IO@RajPolice2026</code> (Investigating Officer)<br>
+            - <code>sp_verma</code> / <code>SP@RajPolice2026</code> (Senior Officer - can verify)<br>
+            - <code>admin</code> / <code>Admin@RajPolice2026</code> (System Admin - audit logs)
+          </div>
+          <div style="margin-top: 16px;">
+            <button type="submit" class="btn btn-police" style="width: 100%;">Sign In</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main JavaScript -->
+  <script src="/static/app.js"></script>
+</body>
+</html>
