@@ -1,0 +1,30 @@
+{
+  "generation_info": {
+    "generator": "CodeWiki Documentation Engine",
+    "version": "2.0.0",
+    "main_model": "CodeWiki Repository Analyst & Architect",
+    "timestamp": "2026-11-24T22:30:00Z",
+    "commit_id": "c1f7a932b84e",
+    "language": "en"
+  },
+  "statistics": {
+    "total_components": 42,
+    "max_depth": 2,
+    "total_modules": 10,
+    "languages": {
+      "Python": 88.5,
+      "JavaScript": 8.0,
+      "HTML/CSS": 3.5
+    },
+    "test_coverage": "31/31 Automated Tests Passing (100%)"
+  },
+  "repository": {
+    "name": "Rajasthan Police CDR/IPDR Analysis Tool & AI Assistant",
+    "tagline": "Forensic Telecommunications Intelligence, CGNAT IPDR Resolution, and Bilingual AI Copilot",
+    "challenge": "Rajasthan Police Hackathon 2026 (Problem Statement PS03)",
+    "statutory_compliance": [
+      "Section 65B Indian Evidence Act (Forensic Lineage Certification)",
+      "Section 5(2) Indian Telegraph Act (Metadata Only / Non-Interception Guardrails)"
+    ]
+  }
+}
