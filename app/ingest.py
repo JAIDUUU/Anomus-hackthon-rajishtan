@@ -148,6 +148,8 @@ def ingest_cdr_data(
                     raw_time = f"{row['Call_Date'].strip()} {row['Call_Initiation_Time'].strip()}".strip()
                 elif "call_date" in row and "call_start_time" in row:
                     raw_time = f"{row['call_date'].strip()} {row['call_start_time'].strip()}".strip()
+                elif "call_date" in row and "call_time" in row:
+                    raw_time = f"{row['call_date'].strip()} {row['call_time'].strip()}".strip()
 
         raw_dur = row.get(col_map.get("duration_sec", "Call_Duration_Sec"), "").strip()
         raw_type = row.get(col_map.get("call_type", "Call_Direction"), "").strip()
@@ -296,15 +298,15 @@ def ingest_ipdr_data(
         source_row = idx + 2
         reasons = []
 
-        sub_num = row.get(col_map.get("subscriber_number", "subscriber_msisdn"), "").strip()
-        src_ip = row.get(col_map.get("source_ip", "source_ip"), "").strip() or row.get("public_nat_ip", "").strip()
+        sub_num = row.get(col_map.get("subscriber_number", "subscriber_msisdn"), "").strip() or row.get("phone_number", "").strip()
+        src_ip = row.get(col_map.get("source_ip", "source_ip"), "").strip() or row.get("public_nat_ip", "").strip() or row.get("ip_address", "").strip()
         src_port_val = row.get(col_map.get("source_port", "source_port"), "").strip() or row.get("public_nat_port", "").strip()
         dst_ip = row.get(col_map.get("destination_ip", "dest_ip"), "").strip() or row.get("destination_ip", "").strip()
         dst_port_val = row.get(col_map.get("destination_port", "dest_port"), "").strip() or row.get("destination_port", "").strip()
         sess_start_val = row.get(col_map.get("session_start", "session_start"), "").strip() or row.get("session_start_timestamp", "").strip()
         sess_end_val = row.get(col_map.get("session_end", "session_end"), "").strip() or row.get("session_end_timestamp", "").strip()
         bytes_val = row.get(col_map.get("bytes_transferred", "bytes_transferred"), "").strip() or row.get("total_bytes_transferred", "0").strip()
-        app_hint = row.get(col_map.get("app_hint", "app_protocol_hint"), "").strip()
+        app_hint = row.get(col_map.get("app_hint", "app_protocol_hint"), "").strip() or "Internet Data / HTTPS"
 
         if not sub_num:
             reasons.append("Missing subscriber number")
@@ -312,16 +314,13 @@ def ingest_ipdr_data(
         if not src_ip:
             reasons.append("Missing source public IP")
             missing_counts["source_ip"] += 1
-        if not src_port_val:
-            reasons.append("Missing source port")
-            missing_counts["source_port"] += 1
         if not sess_start_val:
             reasons.append("Missing session start time")
             missing_counts["session_start"] += 1
 
         norm_sub = normalize_phone_number(sub_num)
         try:
-            src_port = int(src_port_val)
+            src_port = int(src_port_val) if src_port_val else 0
         except Exception:
             src_port = 0
             if src_port_val:
