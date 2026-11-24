@@ -51,12 +51,8 @@
       </div>
     </div>
 
-    <!-- Header Right Actions: 1-Click Demo, Theme Toggle, Notifications, Profile, Role Switch -->
+    <!-- Header Right Actions: Theme Toggle, Notifications, Profile, Role Switch -->
     <div class="header-actions">
-      <button id="btn-load-demo" class="btn btn-gold" onclick="loadDemoCase()">
-        ⚡ Load Demo Case
-      </button>
-
       <button id="btn-theme-toggle" class="theme-toggle-btn" title="Toggle Dark/Light Theme" onclick="toggleTheme()">
         ☀️
       </button>
@@ -1089,22 +1085,22 @@
             <form onsubmit="handleIpdrMatch(event)">
               <div class="form-group">
                 <label class="form-label">Source Public IP:</label>
-                <input type="text" id="ipdr-query-ip" class="form-control" value="103.211.54.12" required>
+                <input type="text" id="ipdr-query-ip" class="form-control" placeholder="Enter Public NAT IP" required>
               </div>
 
               <div class="form-group">
                 <label class="form-label">Source Port:</label>
-                <input type="number" id="ipdr-query-port" class="form-control" value="44321" required>
+                <input type="number" id="ipdr-query-port" class="form-control" placeholder="Enter Source Port" required>
               </div>
 
               <div class="form-group">
                 <label class="form-label">Timestamp (ISO / Standard):</label>
-                <input type="text" id="ipdr-query-time" class="form-control" value="2026-11-20 18:25:10" required>
+                <input type="text" id="ipdr-query-time" class="form-control" placeholder="YYYY-MM-DD HH:MM:SS" required>
               </div>
 
               <div style="display: flex; gap: 8px; margin-top: 14px;">
                 <button type="submit" class="btn btn-police">Resolve Subscriber &amp; App</button>
-                <button type="button" class="btn btn-outline" onclick="prefillIpdrTest()">Quick Pre-fill Test Session</button>
+                <button type="button" class="btn btn-outline" onclick="prefillIpdrTest()">Load Sample from Case IPDR</button>
               </div>
             </form>
 
@@ -1195,55 +1191,90 @@
 
       <!-- ================= MODULE 24: DATA INGESTION & MAPPING ================= -->
       <section id="view-import" class="module-view">
-        <div class="grid-2">
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">📤 Upload CDR / IPDR Files</div>
-              <span class="role-tag role-io">Investigating Officer</span>
+        <div id="ingestion-gate-banner" class="command-hero" style="margin-bottom: 16px;">
+          <div class="command-hero-emblem">📥</div>
+          <div style="flex:1;">
+            <div class="command-hero-kicker">INGESTION-FIRST WORKFLOW</div>
+            <div class="command-hero-title">Dual-Format Telecom Data Ingestion (CSV &amp; Excel)</div>
+            <div class="command-hero-sub" id="ingestion-gate-msg">
+              Step 1: Register or select a Case &rarr; Step 2: Upload CDR &amp; IPDR files (CSV or Excel .xlsx/.xls) &amp; verify dynamic column mappings &rarr; Step 3: Unlock Investigation Command Center.
+            </div>
+          </div>
+          <button class="btn btn-gold" onclick="openNewCaseModal()">+ Register FIR Case</button>
+        </div>
+
+        <form id="upload-form" onsubmit="handleDualFileUpload(event)">
+          <div class="grid-2">
+            <!-- FORMAT SLOT 1 -->
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">📄 Format Slot 1 (Primary CSV / Excel)</div>
+                <span class="role-tag role-io">Required</span>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Select File (.csv, .xlsx, .xls):</label>
+                <input type="file" id="upload-file-1" class="form-control" accept=".csv,.xlsx,.xls,.tsv" onchange="inspectSlotFile(1)" required>
+              </div>
+              <div class="grid-2" style="gap:10px;">
+                <div class="form-group">
+                  <label class="form-label">Record Type:</label>
+                  <select id="upload-type-1" class="form-control" onchange="updateSlotMappingOptions(1)">
+                    <option value="CDR">CDR (Call Detail Records)</option>
+                    <option value="IPDR">IPDR (IP Detail Records)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Mapping Mode:</label>
+                  <select id="upload-mapping-1" class="form-control" onchange="renderSlotMapperFromPreset(1)">
+                    <option value="auto">Auto-Detect Columns</option>
+                  </select>
+                </div>
+              </div>
+              <div id="slot1-inspect-box" style="margin-top: 10px; display: none;"></div>
             </div>
 
-            <form id="upload-form" onsubmit="handleFileUpload(event)">
+            <!-- FORMAT SLOT 2 -->
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">📊 Format Slot 2 (Second Format / Operator / IPDR)</div>
+                <span class="metric-card-badge badge-blue">Dual-Format</span>
+              </div>
               <div class="form-group">
-                <label class="form-label">Data File Type:</label>
-                <select id="upload-file-type" class="form-control" onchange="updateMappingOptions()">
-                  <option value="CDR">CDR (Call Detail Records)</option>
-                  <option value="IPDR">IPDR (Internet Protocol Detail Records)</option>
-                </select>
+                <label class="form-label">Select Second File (.csv, .xlsx, .xls):</label>
+                <input type="file" id="upload-file-2" class="form-control" accept=".csv,.xlsx,.xls,.tsv" onchange="inspectSlotFile(2)">
               </div>
-
-              <div class="form-group">
-                <label class="form-label">Operator Column Mapping Format:</label>
-                <select id="upload-mapping-select" class="form-control">
-                  <option value="operator_a">Operator A (Standard CSV, +91, sec)</option>
-                  <option value="operator_b">Operator B (Telco Format 2, mm:ss)</option>
-                  <option value="ipdr_operator_a">Operator A (IPDR Log Format)</option>
-                </select>
-                <small style="color: var(--text-muted); display: block; margin-top: 4px;">
-                  Column mappings are stored in JSON and dynamically normalized to standard schema.
-                </small>
+              <div class="grid-2" style="gap:10px;">
+                <div class="form-group">
+                  <label class="form-label">Record Type:</label>
+                  <select id="upload-type-2" class="form-control" onchange="updateSlotMappingOptions(2)">
+                    <option value="IPDR">IPDR (IP Detail Records)</option>
+                    <option value="CDR">CDR (Second Operator Format)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Mapping Mode:</label>
+                  <select id="upload-mapping-2" class="form-control" onchange="renderSlotMapperFromPreset(2)">
+                    <option value="auto">Auto-Detect Columns</option>
+                  </select>
+                </div>
               </div>
-
-              <div class="form-group">
-                <label class="form-label">Select CSV File:</label>
-                <input type="file" id="upload-file-input" class="form-control" accept=".csv" required>
-              </div>
-
-              <div style="display: flex; gap: 8px; margin-top: 14px;">
-                <button type="submit" class="btn btn-police">Upload &amp; Ingest</button>
-                <button type="button" class="btn btn-outline" onclick="openMappingEditorModal()">Edit Mapping Config</button>
-              </div>
-            </form>
-
-            <div id="upload-progress-alert" style="margin-top: 14px; display: none;"></div>
+              <div id="slot2-inspect-box" style="margin-top: 10px; display: none;"></div>
+            </div>
           </div>
 
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">📋 Live Validation &amp; Ingestion Report</div>
-            </div>
-            <div id="validation-report-container">
-              <p style="color: var(--text-muted); font-size: 13px;">Upload a file or click "Load Demo Case" to view the validation breakdown.</p>
-            </div>
+          <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 16px;">
+            <button type="submit" class="btn btn-police" id="btn-ingest-submit">📤 Ingest Uploaded Format(s) &amp; Unlock Analysis</button>
+            <button type="button" class="btn btn-outline" onclick="openMappingEditorModal()">Edit / Save Mapping JSON</button>
+            <div id="upload-progress-alert" style="display: none; flex: 1;"></div>
+          </div>
+        </form>
+
+        <div class="card" style="margin-bottom: 16px;">
+          <div class="card-header">
+            <div class="card-title">📋 Live Validation &amp; Ingestion Report</div>
+          </div>
+          <div id="validation-report-container">
+            <p style="color: var(--text-muted); font-size: 13px;">Upload CDR/IPDR files above to view row-by-row validation results and unlock analytics.</p>
           </div>
         </div>
 
@@ -1328,12 +1359,8 @@
           </div>
         </form>
 
-        <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px;">
-          Sample IMEIs from Case:
-          <button class="chip-btn" onclick="lookupTacSample('352841104581294')">iPhone 14 Pro</button>
-          <button class="chip-btn" onclick="lookupTacSample('355832119832043')">Galaxy S23</button>
-          <button class="chip-btn" onclick="lookupTacSample('358910000001329')">OnePlus 12</button>
-          <button class="chip-btn" onclick="lookupTacSample('864985048123902')">Redmi Note 12</button>
+        <div id="tac-dynamic-samples" style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px;">
+          Upload CDR records to populate case IMEI shortcuts.
         </div>
 
         <div id="tac-result-card" style="display: none; background: #0d172c; border: 1px solid #1e293b; border-radius: 6px; padding: 14px;">

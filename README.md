@@ -16,7 +16,7 @@
   <img alt="SQLite" src="https://img.shields.io/badge/SQLite-WAL%20Mode-003B57?style=flat-square&logo=sqlite&logoColor=white" />
   <img alt="LangGraph" src="https://img.shields.io/badge/LangGraph-Agentic%20Copilot-orange?style=flat-square" />
   <img alt="Cytoscape.js" src="https://img.shields.io/badge/Cytoscape.js-Topology%20Graph-e11d48?style=flat-square" />
-  <img alt="Tests" src="https://img.shields.io/badge/Tests-33%2F33%20Passed%20(100%25)-success?style=flat-square&logo=pytest&logoColor=white" />
+  <img alt="Tests" src="https://img.shields.io/badge/Tests-41%2F41%20Passed%20(100%25)-success?style=flat-square&logo=pytest&logoColor=white" />
   <img alt="Evidence Act" src="https://img.shields.io/badge/Compliance-Sec%2065B%20Evidence%20Act-purple?style=flat-square" />
   <img alt="Telegraph Act" src="https://img.shields.io/badge/Guardrails-Sec%205(2)%20Telegraph%20Act-red?style=flat-square" />
   <a href="./LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" /></a>
@@ -30,7 +30,7 @@
   <a href="#-role-based-access-control-rbac"><strong>Roles & Auth</strong></a> •
   <a href="#-forensic-capabilities--intelligence-catalog"><strong>Features</strong></a> •
   <a href="#-codewiki-interactive-documentation"><strong>CodeWiki Docs</strong></a> •
-  <a href="#-automated-testing--verification"><strong>Tests (33/33)</strong></a>
+  <a href="#-automated-testing--verification"><strong>Tests (41/41)</strong></a>
 </p>
 
 ---
@@ -182,16 +182,15 @@ The application implements a multi-tier police hierarchy with instant role switc
 
 Follow this sequential walkthrough to evaluate all core features during the hackathon demonstration:
 
-### Step 1: One-Click Demo Initialization
-- In the top header bar, click the gold **"⚡ Load Demo Case (1-Click)"** button.
-- The system automatically creates case `CASE-RAJ-2026-0042` (*"Operation Maru-Drishti"*), initializes Rajasthan cell site coordinates, and ingests:
-  - **1,998 CDR records** across two distinct operator formats.
-  - **312 IPDR session records**.
-  - 3 primary suspects: `S1 (9829022222)`, `S2 (9829033333)`, and `S3 (9829044444)`.
+### Step 1: Clean Ingestion-First Case Initialization (Zero Pre-Loaded Data)
+- On initial launch, the system starts completely clean (`0` cases, `0` CDRs, `0` IPDRs) and routes directly to the **Dual-Format Data Ingestion Screen**.
+- Click **"+ Register FIR Case"** to create a new investigation dossier.
+- Use **Format Slot 1** & **Format Slot 2** to upload telecom records in **2 formats** (`.csv` and/or Excel `.xlsx`/`.xls` — e.g., Operator A CDR + Operator B CDR/IPDR).
+- On file selection, `/api/ingest/inspect` auto-detects file type and headers dynamically so you can verify or adjust column mappings before clicking **"Ingest Uploaded Format(s) & Unlock Analysis"**.
 
-### Step 2: Heterogeneous Data Ingestion & Validation (Tab 1)
-- Review the live validation summary: Total rows, valid rows, and quarantined test rejections (Missing IMEI, unparseable timestamp, duplicates).
-- Click **"Edit Mapping Config"** to view real-time dynamic JSON column mappings (`operator_a.json`, `operator_b.json`).
+### Step 2: Live Validation & Dynamic Mapping Inspection
+- Review the combined validation summary: Total rows, valid rows, and quarantined test rejections (missing IMEI, unparseable timestamp, duplicates).
+- Click **"Edit / Save Mapping JSON"** to persist reusable operator mapping presets into `data/mappings/`.
 
 ### Step 3: Communication Patterns & Cross-Suspect Matrix (Tab 2)
 - Click suspect chip `S1 (Vikram)`. Observe total call volume, in/out ratio, talk duration, and first/last active call dates.
@@ -209,10 +208,9 @@ Follow this sequential walkthrough to evaluate all core features during the hack
   - System flags a confirmed physical rendezvous between `S1 (9829022222)` and `S2 (9829033333)` at tower `RAJ-JPR-102` (Jaipur - MI Road) within a 15-minute window.
 - Under **IMEI / SIM Swap Detection**, observe suspect `S3` (`354890123456783`) switching SIM cards from `9829044444` to `9829077777`.
 
-### Step 6: Carrier-Grade NAT (CGNAT) IPDR Resolution (Tab 5)
-- Click **"Quick Pre-fill Test Session"** (`103.211.54.12:44321` on `2026-11-20 18:25:10`).
-- Click **"Resolve Subscriber & App"**:
-  - Successfully resolves public NAT IP/port tuple to subscriber `9829022222` with application hint `Telegram (Encrypted VoIP)` and exact source evidence trail (`ipdr_operator_A.csv:Row 42`).
+### Step 6: Carrier-Grade NAT (CGNAT) IPDR Resolution
+- Click **"Load Sample from Case IPDR"** (dynamically pulls a real uploaded IPDR session from the active case) or enter any public NAT IP + port + timestamp.
+- Click **"Resolve Subscriber & App"** to attribute the subscriber MSISDN, application signature hint, and source evidence trail.
 
 ### Step 7: Bilingual AI Copilot & Legal Guardrails (Tab 6)
 - **English Query**: `"Who are the top frequent contacts of S1 9829022222?"` $\rightarrow$ Returns ranked contacts with talk durations and call breakdown.
@@ -299,21 +297,19 @@ Browse the detailed module documentation directly on GitHub:
 The codebase includes comprehensive automated test suites covering all normalization rules, analytical routines, AI guardrails, demo workflows, and external datasets.
 
 ```bash
-# Run the complete test suite (33 tests)
+# Run the complete isolated test suite (41 tests)
 PYTHONPATH=. pytest tests/ -v
 ```
 
 ### Test Suite Summary
 
 ```text
-tests/test_core.py ......................... PASSED (Phone/duration normalization, CDR ingest, common numbers, SIM swap, guardrails)
-tests/test_demo_flow.py .................... PASSED (Complete 8-step end-to-end demo flow execution)
+tests/test_core.py ......................... PASSED (Normalization, Excel/CSV ingestion, dynamic inspect, common numbers, SIM swap, guardrails)
+tests/test_demo_flow.py .................... PASSED (Complete end-to-end upload, correlation, AI copilot, verification, PDF/XLSX export, audit)
 tests/test_external_datasets.py ........... PASSED (Multi-operator external CDR & IPDR validation)
-tests/test_forensic_suite.py ............... PASSED (TAC lookup, executive metrics, raw CDR pagination, MFC, day/night,
-                                                     first/last, missing dates, movement, service numbers, international,
-                                                     global search, API endpoints, role permissions)
+tests/test_forensic_suite.py ............... PASSED (External JSON TAC/service config, link analysis, dynamic analytics, API endpoints, RBAC)
 
-======================= 33 passed in 12.02s =======================
+======================= 41 passed =======================
 ```
 
 ---

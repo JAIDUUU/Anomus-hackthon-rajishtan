@@ -20,8 +20,11 @@ const cdrPageLimit = 25;
 let cdrTotalRecords = 0;
 let cdrSearchDebounceTimer = null;
 
-// Cached analytics data
+// Cached analytics data & dynamic ingestion state
 let cachedAnalytics = null;
+let currentCaseHasData = false;
+let cachedMappings = {};
+let slotInspections = { 1: null, 2: null };
 
 // ----------------- DOM READY INITIALIZATION -----------------
 document.addEventListener("DOMContentLoaded", async () => {
@@ -207,7 +210,18 @@ async function loadCasesList() {
     selector.innerHTML = "";
 
     if (cases.length === 0) {
-      selector.innerHTML = `<option value="">-- No Cases In System --</option>`;
+      currentCaseId = "";
+      currentCaseHasData = false;
+      selector.innerHTML = `<option value="">-- No Cases Registered --</option>`;
+      document.getElementById("stat-hdr-cdr").innerText = "0";
+      document.getElementById("stat-hdr-ipdr").innerText = "0";
+      document.getElementById("stat-hdr-suspects").innerText = "0";
+      document.getElementById("badge-cdr-count").innerText = "0";
+      const gateMsg = document.getElementById("ingestion-gate-msg");
+      if (gateMsg) {
+        gateMsg.innerText = "Step 1: Click '+ Register FIR Case' -> Step 2: Upload CDR/IPDR files in 2 formats (CSV / Excel) -> Step 3: Analytics unlock automatically.";
+      }
+      switchView("import");
       return;
     }
 
@@ -236,12 +250,22 @@ async function changeActiveCase(caseId) {
 
 async function onCaseSelected(caseId) {
   cachedAnalytics = null;
-  ["common-numbers-input", "meet-num1", "meet-num2", "link-num1", "link-num2", "ipdr-sub-input"].forEach(id => {
+  ["common-numbers-input", "meet-num1", "meet-num2", "link-num1", "link-num2", "ipdr-sub-input", "ipdr-query-ip", "ipdr-query-port", "ipdr-query-time"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = "";
   });
   await loadExecutiveMetrics(caseId);
   await loadCaseDetails(caseId);
+
+  if (!currentCaseHasData) {
+    const gateMsg = document.getElementById("ingestion-gate-msg");
+    if (gateMsg) {
+      gateMsg.innerText = `Active Case '${caseId}' has 0 records. Upload CDR & IPDR files in 2 formats (CSV / Excel) below to unlock analytics.`;
+    }
+    switchView("import");
+    return;
+  }
+
   await getCaseAnalytics();
 
   // Refresh whatever active view is open
@@ -260,12 +284,16 @@ async function loadCaseDetails(caseId) {
     if (!res.ok) return;
     const data = await res.json();
 
+    const cdrCnt = data.stats.cdr_count || 0;
+    const ipdrCnt = data.stats.ipdr_count || 0;
+    currentCaseHasData = (cdrCnt + ipdrCnt) > 0;
+
     // Update Header Stats
-    document.getElementById("stat-hdr-cdr").innerText = data.stats.cdr_count || 0;
-    document.getElementById("stat-hdr-ipdr").innerText = data.stats.ipdr_count || 0;
+    document.getElementById("stat-hdr-cdr").innerText = cdrCnt;
+    document.getElementById("stat-hdr-ipdr").innerText = ipdrCnt;
     const suspects = (data.brief_data && data.brief_data.suspects) ? data.brief_data.suspects : [];
     document.getElementById("stat-hdr-suspects").innerText = suspects.length;
-    document.getElementById("badge-cdr-count").innerText = data.stats.cdr_count || 0;
+    document.getElementById("badge-cdr-count").innerText = cdrCnt;
 
     // Update Dashboard Brief
     document.getElementById("dash-case-title").innerText = `${data.id}: ${data.title}`;
@@ -286,40 +314,10 @@ async function loadCaseDetails(caseId) {
         chipsBox.appendChild(btn);
       });
     } else {
-      chipsBox.innerHTML = `<span style="color:var(--text-muted);font-size:12px;">No suspects indexed yet.</span>`;
+      chipsBox.innerHTML = `<span style="color:var(--text-muted);font-size:12px;">Targets will appear dynamically after CDR ingestion.</span>`;
     }
   } catch (err) {
     console.error("Error loading case details:", err);
-  }
-}
-
-async function loadDemoCase() {
-  const btn = document.getElementById("btn-load-demo");
-  const origText = btn.innerText;
-  btn.innerText = "⏳ Loading Demo Case...";
-  btn.disabled = true;
-
-  try {
-    const res = await fetch("/api/cases/demo", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${currentToken}` }
-    });
-    const data = await res.json();
-    if (res.ok) {
-      alert("✅ Demo Case 'CASE-RAJ-2026-0042' loaded successfully with CDRs & IPDRs!");
-      await loadCasesList();
-      currentCaseId = "CASE-RAJ-2026-0042";
-      document.getElementById("case-selector").value = currentCaseId;
-      await onCaseSelected(currentCaseId);
-    } else {
-      alert("Error: " + (data.detail || "Failed to load demo case"));
-    }
-  } catch (e) {
-    console.error("Demo loader error:", e);
-    alert("Connection error loading demo case");
-  } finally {
-    btn.innerText = origText;
-    btn.disabled = false;
   }
 }
 
@@ -348,6 +346,15 @@ async function loadExecutiveMetrics(caseId = null) {
 
 // ----------------- SIDEBAR & VIEW SWITCHER -----------------
 function switchView(viewName) {
+  // Enforce ingestion-first gate: analytics require uploaded data
+  if (!currentCaseHasData && viewName !== "import" && viewName !== "audit") {
+    viewName = "import";
+    const gateMsg = document.getElementById("ingestion-gate-msg");
+    if (gateMsg) {
+      gateMsg.innerHTML = `<span style="color:#fbbf24;">⚠️ Pehle format files (CSV / Excel CDR &amp; IPDR) upload karein — uske baad hi forensic analytics unlock honge!</span>`;
+    }
+  }
+
   // Update sidebar buttons
   document.querySelectorAll(".sidebar-nav-btn").forEach(btn => {
     btn.classList.remove("active");
@@ -1431,10 +1438,26 @@ async function handleIpdrMatch(e) {
   }
 }
 
-function prefillIpdrTest() {
-  document.getElementById("ipdr-query-ip").value = "103.211.54.12";
-  document.getElementById("ipdr-query-port").value = "44321";
-  document.getElementById("ipdr-query-time").value = "2026-11-20 18:25:10";
+async function prefillIpdrTest() {
+  if (!currentCaseId) {
+    alert("Please create/select a case and upload IPDR data first.");
+    return;
+  }
+  try {
+    const res = await fetch(`/api/cases/${currentCaseId}/ipdr/sample`, {
+      headers: { "Authorization": `Bearer ${currentToken}` }
+    });
+    const d = await res.json();
+    if (!d.available) {
+      alert("No IPDR records uploaded in this case yet. Upload an IPDR CSV/Excel file first.");
+      return;
+    }
+    document.getElementById("ipdr-query-ip").value = d.source_ip;
+    document.getElementById("ipdr-query-port").value = d.source_port;
+    document.getElementById("ipdr-query-time").value = d.timestamp;
+  } catch (e) {
+    alert("Unable to fetch uploaded IPDR sample.");
+  }
 }
 
 async function runSubscriberIpdr() {
@@ -1611,90 +1634,227 @@ function downloadCaseReport(format) {
   window.open(`/api/cases/${currentCaseId}/report?format=${format}`, "_blank");
 }
 
-// ----------------- MODULE: INGESTION & BATCHES -----------------
+// ----------------- MODULE: INGESTION & BATCHES (DUAL-FORMAT DYNAMIC MAPPER) -----------------
 async function loadAvailableMappings() {
   try {
     const res = await fetch("/api/mappings");
     if (!res.ok) return;
-    const mappings = await res.json();
-    const select = document.getElementById("upload-mapping-select");
-    select.innerHTML = "";
-    Object.keys(mappings).forEach(k => {
-      const opt = document.createElement("option");
-      opt.value = k;
-      opt.textContent = `${mappings[k].operator_name || k} (${mappings[k].description || ""})`;
-      select.appendChild(opt);
-    });
+    cachedMappings = await res.json();
+    updateSlotMappingOptions(1);
+    updateSlotMappingOptions(2);
   } catch (err) {
     console.error("Error loading mappings:", err);
   }
 }
 
-function updateMappingOptions() {
-  const type = document.getElementById("upload-file-type").value;
-  const select = document.getElementById("upload-mapping-select");
-  if (type === "IPDR") {
-    select.value = "ipdr_operator_a";
-  } else {
-    select.value = "operator_a";
+function updateSlotMappingOptions(slot) {
+  const typeEl = document.getElementById(`upload-type-${slot}`);
+  const sel = document.getElementById(`upload-mapping-${slot}`);
+  if (!typeEl || !sel) return;
+  const ftype = typeEl.value;
+  sel.innerHTML = `<option value="auto">✨ Auto-Detect Dynamic Columns</option>`;
+  Object.keys(cachedMappings).forEach(k => {
+    const cfg = cachedMappings[k];
+    const isIpdr = (cfg.file_type || (k.includes("ipdr") ? "IPDR" : "CDR")).toUpperCase() === "IPDR";
+    if ((ftype === "IPDR" && isIpdr) || (ftype === "CDR" && !isIpdr)) {
+      const opt = document.createElement("option");
+      opt.value = k;
+      opt.textContent = `${cfg.operator_name || k} (${cfg.description || ""})`;
+      sel.appendChild(opt);
+    }
+  });
+  if (slotInspections[slot]) {
+    renderSlotMapperUI(slot);
   }
 }
 
-async function handleFileUpload(e) {
-  e.preventDefault();
-  const fileInput = document.getElementById("upload-file-input");
-  if (!fileInput.files || fileInput.files.length === 0) return;
+async function inspectSlotFile(slot) {
+  const input = document.getElementById(`upload-file-${slot}`);
+  const box = document.getElementById(`slot${slot}-inspect-box`);
+  if (!input || !input.files || input.files.length === 0) {
+    slotInspections[slot] = null;
+    if (box) box.style.display = "none";
+    return;
+  }
+
+  const file = input.files[0];
+  box.style.display = "block";
+  box.innerHTML = `<div class="spinner"></div> Inspecting columns in <b>${file.name}</b>...`;
+
+  const fd = new FormData();
+  fd.append("file", file);
+  try {
+    const res = await fetch("/api/ingest/inspect", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${currentToken}` },
+      body: fd
+    });
+    const info = await res.json();
+    if (!res.ok) {
+      box.innerHTML = `<span style="color:#fca5a5;">❌ ${info.detail || "Unable to inspect file"}</span>`;
+      slotInspections[slot] = null;
+      return;
+    }
+
+    slotInspections[slot] = info;
+    const typeEl = document.getElementById(`upload-type-${slot}`);
+    if (typeEl) {
+      typeEl.value = info.suggested_type || "CDR";
+      updateSlotMappingOptions(slot);
+    }
+    renderSlotMapperUI(slot);
+  } catch (err) {
+    box.innerHTML = `<span style="color:#fca5a5;">❌ File inspection failed: ${err.message}</span>`;
+  }
+}
+
+function renderSlotMapperFromPreset(slot) {
+  if (!slotInspections[slot]) return;
+  const presetKey = document.getElementById(`upload-mapping-${slot}`).value;
+  if (presetKey !== "auto" && cachedMappings[presetKey]) {
+    slotInspections[slot].active_mapping = { ...(cachedMappings[presetKey].mappings || {}) };
+  } else {
+    slotInspections[slot].active_mapping = { ...(slotInspections[slot].suggested_mapping || {}) };
+  }
+  renderSlotMapperUI(slot);
+}
+
+function renderSlotMapperUI(slot) {
+  const info = slotInspections[slot];
+  const box = document.getElementById(`slot${slot}-inspect-box`);
+  if (!info || !box) return;
+
+  const ftype = document.getElementById(`upload-type-${slot}`).value;
+  const fields = ftype === "IPDR"
+    ? ["subscriber_number", "source_ip", "source_port", "destination_ip", "destination_port", "session_start", "session_end", "bytes_transferred", "app_hint"]
+    : ["a_number", "b_number", "call_type", "start_time", "duration_sec", "imei", "imsi", "cell_id"];
+
+  const currentMap = info.active_mapping || info.suggested_mapping || {};
+  const colOptions = (selected) => {
+    let opts = `<option value="">-- Skip / None --</option>`;
+    info.columns.forEach(col => {
+      const sel = (Array.isArray(selected) ? selected[0] === col : selected === col) ? "selected" : "";
+      opts += `<option value="${col}" ${sel}>${col}</option>`;
+    });
+    return opts;
+  };
+
+  box.innerHTML = `
+    <div style="background:var(--bg-card-subtle);border:1px solid var(--border-color);border-radius:6px;padding:10px;font-size:11.5px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <span>Detected: <b style="color:#38bdf8;">${info.format}</b> (${info.row_count} rows, ${info.columns.length} cols)</span>
+        <span class="metric-card-badge badge-green">Dynamic Map Ready</span>
+      </div>
+      <div class="grid-2" style="gap:6px;">
+        ${fields.map(f => `
+          <div>
+            <label style="color:var(--text-muted);font-size:10.5px;display:block;">${f}:</label>
+            <select class="form-control slot-${slot}-col-map" data-field="${f}" style="padding:4px 6px;font-size:11px;">
+              ${colOptions(currentMap[f] || "")}
+            </select>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function collectSlotMapping(slot) {
+  const selects = document.querySelectorAll(`.slot-${slot}-col-map`);
+  if (!selects.length) return null;
+  const map = {};
+  selects.forEach(sel => {
+    const field = sel.getAttribute("data-field");
+    if (sel.value) map[field] = sel.value;
+  });
+  return { name: `Dynamic Slot ${slot}`, mappings: map };
+}
+
+async function uploadSingleSlot(slot) {
+  const fileInput = document.getElementById(`upload-file-${slot}`);
+  if (!fileInput || !fileInput.files || fileInput.files.length === 0) return null;
 
   const file = fileInput.files[0];
-  const type = document.getElementById("upload-file-type").value;
-  const mapping = document.getElementById("upload-mapping-select").value;
+  const ftype = document.getElementById(`upload-type-${slot}`).value;
+  const mappingKey = document.getElementById(`upload-mapping-${slot}`).value;
+  const dynMapping = collectSlotMapping(slot);
 
   const formData = new FormData();
   formData.append("file", file);
-  formData.append("file_type", type);
-  formData.append("mapping_name", mapping);
+  formData.append("file_type", ftype);
+  formData.append("mapping_name", mappingKey);
+  if (dynMapping) {
+    formData.append("custom_mapping_json", JSON.stringify(dynMapping));
+  }
+
+  const res = await fetch(`/api/cases/${currentCaseId}/upload`, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${currentToken}` },
+    body: formData
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(`${file.name}: ${data.detail || "Upload failed"}`);
+  }
+  return data;
+}
+
+async function handleDualFileUpload(e) {
+  e.preventDefault();
+  if (!currentCaseId) {
+    alert("Please register or select an FIR Case first (+ Register FIR Case).");
+    openNewCaseModal();
+    return;
+  }
 
   const alertBox = document.getElementById("upload-progress-alert");
   alertBox.style.display = "block";
   alertBox.className = "alert-banner";
-  alertBox.innerText = `⏳ Ingesting and validating ${file.name}...`;
+  alertBox.innerText = "⏳ Inspecting & ingesting uploaded formats...";
 
   try {
-    const res = await fetch(`/api/cases/${currentCaseId}/upload`, {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${currentToken}` },
-      body: formData
-    });
-    const summary = await res.json();
+    const reports = [];
+    for (const slot of [1, 2]) {
+      const rep = await uploadSingleSlot(slot);
+      if (rep) reports.push(rep);
+    }
+    if (!reports.length) {
+      alertBox.innerText = "⚠️ Please select at least one CSV or Excel file.";
+      return;
+    }
 
-    if (res.ok) {
-      alertBox.className = "alert-banner";
-      alertBox.style.background = "rgba(16, 185, 129, 0.2)";
-      alertBox.style.color = "#34d399";
-      alertBox.innerText = `✅ Ingested ${summary.valid_rows} rows successfully. (${summary.rejected_rows} rejected).`;
+    const totalValid = reports.reduce((acc, r) => acc + (r.valid_rows || 0), 0);
+    const totalRej = reports.reduce((acc, r) => acc + (r.rejected_rows || 0), 0);
+    alertBox.style.background = "rgba(16, 185, 129, 0.2)";
+    alertBox.style.color = "#34d399";
+    alertBox.innerText = `✅ Ingested ${reports.length} format(s): ${totalValid} valid rows (${totalRej} rejected). Unlocking Command Center...`;
 
-      displayValidationReport(summary);
-      await loadExecutiveMetrics(currentCaseId);
-      await loadCaseBatches();
-    } else {
-      alertBox.style.background = "rgba(239, 68, 68, 0.2)";
-      alertBox.style.color = "#fca5a5";
-      alertBox.innerText = `❌ Error: ${summary.detail || "Upload failed"}`;
+    displayValidationReports(reports);
+    cachedAnalytics = null;
+    await loadExecutiveMetrics(currentCaseId);
+    await loadCaseDetails(currentCaseId);
+    await getCaseAnalytics();
+    await loadCaseBatches();
+
+    if (currentCaseHasData) {
+      setTimeout(() => switchView("dashboard"), 400);
     }
   } catch (err) {
-    alertBox.innerText = `❌ Ingestion failed: ${err.message}`;
+    alertBox.style.background = "rgba(239, 68, 68, 0.2)";
+    alertBox.style.color = "#fca5a5";
+    alertBox.innerText = `❌ ${err.message}`;
   }
 }
 
-function displayValidationReport(s) {
+function displayValidationReports(reports) {
   const container = document.getElementById("validation-report-container");
-  container.innerHTML = `
-    <div style="font-size:13px; line-height:1.7;">
-      <div><b>File:</b> ${s.filename} &bull; <b>Batch ID:</b> #${s.batch_id}</div>
-      <div><b>Total Processed:</b> ${s.total_rows} | <b>Valid:</b> <span style="color:#10b981;">${s.valid_rows}</span> | <b>Rejected:</b> <span style="color:#ef4444;">${s.rejected_rows}</span></div>
-      ${s.rejected_rows > 0 ? `<div style="color:#ef4444;margin-top:6px;">Sample rejections: ${JSON.stringify(s.rejections.slice(0, 3))}</div>` : ""}
+  container.innerHTML = reports.map(s => `
+    <div style="font-size:13px; line-height:1.7; padding:8px 0; border-bottom:1px solid var(--border-color);">
+      <div><b>File:</b> ${s.filename} &bull; <b>Batch ID:</b> #${s.batch_id ?? "-"} &bull; <b>Mapping:</b> ${s.mapping_used}</div>
+      <div><b>Total:</b> ${s.total_rows} | <b>Valid:</b> <span style="color:#10b981;">${s.valid_rows}</span> | <b>Rejected:</b> <span style="color:#ef4444;">${s.rejected_rows}</span></div>
+      ${(s.rejected_details && s.rejected_details.length) ? `<div style="color:#fca5a5;margin-top:4px;font-size:11.5px;">Sample rejections: ${JSON.stringify(s.rejected_details.slice(0, 2))}</div>` : ""}
     </div>
-  `;
+  `).join("");
 }
 
 async function loadCaseBatches() {
@@ -1768,6 +1928,17 @@ async function loadAuditLogs() {
 // ----------------- MODAL: TAC DEVICE LOOKUP -----------------
 function openTacLookupModal() {
   document.getElementById("modal-tac").classList.add("active");
+  const samplesEl = document.getElementById("tac-dynamic-samples");
+  if (samplesEl) {
+    const imeis = (cachedAnalytics && cachedAnalytics.imei_summary) ? cachedAnalytics.imei_summary.slice(0, 4) : [];
+    if (imeis.length) {
+      samplesEl.innerHTML = `Case IMEIs: ` + imeis.map(im =>
+        `<button class="chip-btn" onclick="lookupTacSample('${im.imei}')">${im.brand} (${im.imei.slice(-4)})</button>`
+      ).join(" ");
+    } else {
+      samplesEl.innerText = "Upload CDR records to populate case IMEI shortcuts.";
+    }
+  }
   document.getElementById("tac-imei-input").focus();
 }
 
