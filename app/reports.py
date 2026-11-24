@@ -16,7 +16,8 @@ from app.analysis import (
     analyze_communication_patterns,
     find_common_numbers,
     detect_meetings,
-    detect_imei_sim_changes
+    detect_imei_sim_changes,
+    get_ordered_suspects_for_case
 )
 
 
@@ -25,18 +26,8 @@ def generate_pdf_report(case_id: str, db: Session) -> io.BytesIO:
     batches = db.query(ImportBatch).filter(ImportBatch.case_id == case_id).all()
     observations = db.query(AIObservation).filter(AIObservation.case_id == case_id).all()
 
-    # Extract suspect numbers from case brief if present
-    suspect_nums = []
-    if case and case.brief_data:
-        try:
-            b = json.loads(case.brief_data)
-            for s in b.get("suspects", []):
-                if s.get("phone"):
-                    suspect_nums.append(s["phone"])
-        except Exception:
-            pass
-    if not suspect_nums:
-        suspect_nums = ["9829022222", "9829033333"]
+    # Extract suspect numbers dynamically from case brief or top active CDR targets
+    suspect_nums = [s["phone"] for s in get_ordered_suspects_for_case(case_id, db) if s.get("phone")]
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(

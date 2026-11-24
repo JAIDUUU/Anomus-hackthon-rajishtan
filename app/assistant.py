@@ -14,7 +14,8 @@ from app.analysis import (
     get_location_timeline,
     detect_meetings,
     detect_imei_sim_changes,
-    get_suspect_numbers_for_case
+    get_suspect_numbers_for_case,
+    get_ordered_suspects_for_case
 )
 from app.ipdr import match_ipdr_session
 
@@ -89,8 +90,8 @@ def detect_intent_rule_based(query: str, suspect_numbers: list[str]) -> tuple[st
     if any(k in q for k in ["meeting", "mili thi", "mile the", "kahan mile", "same tower", "same time", "ikathhe", "together", "encounter", "rendezvous"]):
         target_nums = extracted_nums if len(extracted_nums) >= 2 else suspect_numbers[:2]
         return "meeting_detection", "detect_meetings", {
-            "num1": target_nums[0] if len(target_nums) > 0 else "9829022222",
-            "num2": target_nums[1] if len(target_nums) > 1 else "9829033333"
+            "num1": target_nums[0] if len(target_nums) > 0 else "",
+            "num2": target_nums[1] if len(target_nums) > 1 else ""
         }
 
     # 4. SIM swap / IMEI change detection
@@ -104,17 +105,17 @@ def detect_intent_rule_based(query: str, suspect_numbers: list[str]) -> tuple[st
 
     # 6. Night activity
     if any(k in q for k in ["night", "raat", "late night", "22:00", "der raat", "odd hours", "night time"]):
-        target = extracted_nums[0] if extracted_nums else (suspect_numbers[3] if len(suspect_numbers) > 3 else "9829055555")
+        target = extracted_nums[0] if extracted_nums else (suspect_numbers[-1] if suspect_numbers else "")
         return "night_activity", "analyze_communication_patterns", {"number": target}
 
     # 7. Tower locations / movement
     if any(k in q for k in ["tower", "location", "movement", "kahan tha", "kahan gaya", "route", "timeline", "path", "map"]):
-        target = extracted_nums[0] if extracted_nums else (suspect_numbers[0] if suspect_numbers else "9829022222")
+        target = extracted_nums[0] if extracted_nums else (suspect_numbers[0] if suspect_numbers else "")
         return "location_timeline", "get_location_timeline", {"number": target}
 
     # 8. Frequent / Top contacts
     if any(k in q for k in ["frequent", "top contact", "sabse jyada", "sabse zyada", "adhik call", "most called", "who did he call"]):
-        target = extracted_nums[0] if extracted_nums else (suspect_numbers[0] if suspect_numbers else "9829022222")
+        target = extracted_nums[0] if extracted_nums else (suspect_numbers[0] if suspect_numbers else "")
         return "frequent_contacts", "analyze_communication_patterns", {"number": target}
 
     # 9. Explain chart / graph
@@ -127,7 +128,7 @@ def detect_intent_rule_based(query: str, suspect_numbers: list[str]) -> tuple[st
 
     # General suspect overview
     return "frequent_contacts", "analyze_communication_patterns", {
-        "number": suspect_numbers[0] if suspect_numbers else "9829022222"
+        "number": suspect_numbers[0] if suspect_numbers else ""
     }
 
 
@@ -135,9 +136,8 @@ def intent_node(state: AgentState, db: Session) -> AgentState:
     query = state["query"]
     case_id = state["case_id"]
 
-    suspect_set = list(get_suspect_numbers_for_case(case_id, db))
-    if not suspect_set:
-        suspect_set = ["9829022222", "9829033333", "9829044444", "9829055555"]
+    ordered = get_ordered_suspects_for_case(case_id, db)
+    suspect_set = [s["phone"] for s in ordered if s.get("phone")]
 
     llm_key = os.getenv("LLM_API_KEY")
     # If no LLM key or swappable fallback requested:

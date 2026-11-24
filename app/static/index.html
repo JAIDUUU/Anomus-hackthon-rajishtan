@@ -26,6 +26,7 @@
       <div class="brand-titles">
         <h1>
           RAJASTHAN POLICE - CYBER FORENSIC SUITE
+          <span class="prototype-pill">PROTOTYPE - SYNTHETIC DATA ONLY</span>
         </h1>
         <p>Investigation Command Center &bull; CDR / IPDR Telecom Intelligence (PS03)</p>
       </div>
@@ -38,7 +39,7 @@
           type="text" 
           id="global-search-input" 
           class="global-search-input" 
-          placeholder="Global search (Number, IMEI, Tower, IP)... [Enter]"
+          placeholder="Search number, IMEI, IMSI, case ID, location... [Enter]"
           onkeydown="handleSearchKey(event)"
         >
         <span class="global-search-icon">🔍</span>
@@ -50,15 +51,19 @@
       </div>
     </div>
 
-    <!-- Header Right Actions: 1-Click Demo, Notifications, Profile, Role Switch -->
+    <!-- Header Right Actions: 1-Click Demo, Theme Toggle, Notifications, Profile, Role Switch -->
     <div class="header-actions">
       <button id="btn-load-demo" class="btn btn-gold" onclick="loadDemoCase()">
         ⚡ Load Demo Case
       </button>
 
+      <button id="btn-theme-toggle" class="theme-toggle-btn" title="Toggle Dark/Light Theme" onclick="toggleTheme()">
+        ☀️
+      </button>
+
       <button id="btn-notifs" class="notif-bell-btn" title="System Alerts & Notifications" onclick="toggleNotifsModal()">
         🔔
-        <span id="notif-badge" class="notif-count-badge">3</span>
+        <span id="notif-badge" class="notif-count-badge">0</span>
       </button>
 
       <div class="user-profile-chip" id="user-profile-badge">
@@ -99,112 +104,150 @@
   <!-- ================= APP WORKSPACE (SIDEBAR + MAIN VIEWS) ================= -->
   <div class="app-layout">
     
-    <!-- LEFT SIDEBAR WITH 25+ FORENSIC MODULES -->
+    <!-- LEFT SIDEBAR WITH ALL INVESTIGATION MODULES -->
     <aside class="app-sidebar">
-      <div class="sidebar-group-title">COMMAND &amp; OVERVIEW</div>
+      <div class="sidebar-header-block">
+        <div class="sidebar-header-title">INVESTIGATION</div>
+        <div class="sidebar-header-sub">Analysis modules</div>
+      </div>
+
       <button class="sidebar-nav-btn active" onclick="switchView('dashboard')">
         <span class="nav-icon">🎛️</span>
         <span>Executive Dashboard</span>
         <span class="nav-badge">Core</span>
       </button>
-
-      <div class="sidebar-group-title">TELECOM INTELLIGENCE</div>
+      <button class="sidebar-nav-btn" onclick="switchView('advanced-cdr')">
+        <span class="nav-icon">📚</span>
+        <span>Advanced CDR Analysis</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('graph')">
+        <span class="nav-icon">📊</span>
+        <span>Graph Analytics</span>
+      </button>
       <button class="sidebar-nav-btn" onclick="switchView('raw-cdr')">
-        <span class="nav-icon">📑</span>
+        <span class="nav-icon">🗄️</span>
         <span>Raw CDR Data</span>
         <span class="nav-badge" id="badge-cdr-count">0</span>
       </button>
       <button class="sidebar-nav-btn" onclick="switchView('mfc')">
-        <span class="nav-icon">📊</span>
+        <span class="nav-icon">👥</span>
         <span>MFC Analysis</span>
       </button>
-      <button class="sidebar-nav-btn" onclick="switchView('first-last')">
-        <span class="nav-icon">⏱️</span>
-        <span>First / Last Call</span>
+      <button class="sidebar-nav-btn" onclick="switchView('network-analysis')">
+        <span class="nav-icon">📶</span>
+        <span>Network Analysis</span>
       </button>
-      <button class="sidebar-nav-btn" onclick="switchView('day-night')">
-        <span class="nav-icon">🌓</span>
-        <span>Day / Night Analysis</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('missing-dates')">
-        <span class="nav-icon">📅</span>
-        <span>Missing Dates / Gaps</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('service-numbers')">
-        <span class="nav-icon">🏢</span>
-        <span>Service &amp; Shortcodes</span>
+      <button class="sidebar-nav-btn" onclick="switchView('ownership')">
+        <span class="nav-icon">👤</span>
+        <span>Ownership Intelligence</span>
       </button>
       <button class="sidebar-nav-btn" onclick="switchView('international')">
         <span class="nav-icon">🌍</span>
-        <span>International Intel</span>
+        <span>International Intelligence</span>
       </button>
-      <button class="sidebar-nav-btn" onclick="switchView('advanced-cdr')">
-        <span class="nav-icon">🔎</span>
-        <span>Advanced CDR Query</span>
+      <button class="sidebar-nav-btn" onclick="switchView('service-numbers')">
+        <span class="nav-icon">🏢</span>
+        <span>Service &amp; Company Numbers</span>
       </button>
-
-      <div class="sidebar-group-title">NETWORK &amp; CORRELATION</div>
-      <button class="sidebar-nav-btn" onclick="switchView('graph')">
-        <span class="nav-icon">🕸️</span>
-        <span>Graph Analytics</span>
+      <button class="sidebar-nav-btn" onclick="switchView('imei-summary')">
+        <span class="nav-icon">📱</span>
+        <span>IMEI Summary</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('imsi-summary')">
+        <span class="nav-icon">💳</span>
+        <span>IMSI Summary</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('imei-patterns')">
+        <span class="nav-icon">🧬</span>
+        <span>IMEI Patterns</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('imsi-patterns')">
+        <span class="nav-icon">🪪</span>
+        <span>IMSI Patterns</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('first-last')">
+        <span class="nav-icon">📞</span>
+        <span>First / Last Call</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('location-summary')">
+        <span class="nav-icon">📍</span>
+        <span>Location Summary</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('location-intelligence')">
+        <span class="nav-icon">🧭</span>
+        <span>Location Intelligence</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('day-locations')">
+        <span class="nav-icon">☀️</span>
+        <span>Day Locations</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('day-calls')">
+        <span class="nav-icon">🌤️</span>
+        <span>Day Calls</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('night-locations')">
+        <span class="nav-icon">🌙</span>
+        <span>Night Locations</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('night-calls')">
+        <span class="nav-icon">🌑</span>
+        <span>Night Calls</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('movement')">
+        <span class="nav-icon">🔀</span>
+        <span>Movement Chart</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('cell-id-changes')">
+        <span class="nav-icon">⇄</span>
+        <span>Cell ID Changes</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('location-changes')">
+        <span class="nav-icon">🗺️</span>
+        <span>Location Changes</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('missing-dates')">
+        <span class="nav-icon">📅</span>
+        <span>Missing Dates</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('interactive-timeline')">
+        <span class="nav-icon">🕒</span>
+        <span>Interactive Timeline</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('link-analysis')">
+        <span class="nav-icon">🔗</span>
+        <span>Link Analysis</span>
+      </button>
+      <button class="sidebar-nav-btn" onclick="switchView('geo-map')">
+        <span class="nav-icon">🌐</span>
+        <span>Geo Intelligence</span>
       </button>
       <button class="sidebar-nav-btn" onclick="switchView('common-numbers')">
-        <span class="nav-icon">🔗</span>
+        <span class="nav-icon">🤝</span>
         <span>Common Numbers</span>
       </button>
       <button class="sidebar-nav-btn" onclick="switchView('meetings')">
         <span class="nav-icon">🚨</span>
         <span>Meeting Rendezvous</span>
       </button>
-
-      <div class="sidebar-group-title">HARDWARE &amp; IDENTITY</div>
-      <button class="sidebar-nav-btn" onclick="switchView('imei-summary')">
-        <span class="nav-icon">📱</span>
-        <span>IMEI Summary &amp; TAC</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('imsi-summary')">
-        <span class="nav-icon">💳</span>
-        <span>IMSI Summary</span>
-      </button>
       <button class="sidebar-nav-btn" onclick="switchView('device-changes')">
         <span class="nav-icon">🔄</span>
         <span>SIM Swaps &amp; Hopping</span>
       </button>
-      <button class="sidebar-nav-btn" onclick="switchView('ownership')">
-        <span class="nav-icon">👤</span>
-        <span>Ownership &amp; CAF Dossiers</span>
-      </button>
-
-      <div class="sidebar-group-title">GEO &amp; CYBER INTEL</div>
-      <button class="sidebar-nav-btn" onclick="switchView('geo-map')">
-        <span class="nav-icon">📍</span>
-        <span>Geo Intelligence &amp; Map</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('movement')">
-        <span class="nav-icon">🚀</span>
-        <span>Movement &amp; Cell Changes</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('day-locations')">
-        <span class="nav-icon">☀️</span>
-        <span>Day Locations</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('night-locations')">
-        <span class="nav-icon">🌙</span>
-        <span>Night Locations</span>
+      <button class="sidebar-nav-btn" onclick="switchView('day-night')">
+        <span class="nav-icon">🌓</span>
+        <span>Day / Night Overview</span>
       </button>
       <button class="sidebar-nav-btn" onclick="switchView('ipdr')">
-        <span class="nav-icon">🌐</span>
+        <span class="nav-icon">🛰️</span>
         <span>IPDR Analysis</span>
       </button>
-
-      <div class="sidebar-group-title">INVESTIGATION &amp; COMPLIANCE</div>
       <button class="sidebar-nav-btn" onclick="switchView('assistant')">
         <span class="nav-icon">🤖</span>
         <span>AI Assistant Chat</span>
         <span class="nav-badge" style="background:#0284c7;color:#fff;">AI</span>
       </button>
       <button class="sidebar-nav-btn" onclick="switchView('reports')">
-        <span class="nav-icon">📄</span>
+        <span class="nav-icon">📥</span>
         <span>Reports &amp; Downloads</span>
       </button>
       <button class="sidebar-nav-btn" onclick="switchView('import')">
@@ -223,9 +266,19 @@
       <!-- ================= MODULE 1: EXECUTIVE DASHBOARD ================= -->
       <section id="view-dashboard" class="module-view active">
         
-        <!-- EXECUTIVE 8-CARD METRIC GRID -->
+        <!-- COMMAND CENTER HERO BANNER (IMAGE 4) -->
+        <div class="command-hero">
+          <div class="command-hero-emblem">CDR</div>
+          <div>
+            <div class="command-hero-kicker">CDR FORENSIC ANALYZER</div>
+            <div class="command-hero-title">Investigation Command Center</div>
+            <div class="command-hero-sub">Professional forensic intelligence dashboard, real-time case &amp; CDR analytics</div>
+          </div>
+        </div>
+
+        <!-- EXECUTIVE 8-CARD GRADIENT METRIC GRID -->
         <div class="metric-grid-8" id="executive-metric-grid">
-          <div class="metric-card">
+          <div class="metric-card metric-card-blue">
             <div class="metric-card-header">
               <span class="metric-card-title">Total Cases</span>
               <span class="metric-card-icon">📁</span>
@@ -237,7 +290,7 @@
             </div>
           </div>
 
-          <div class="metric-card">
+          <div class="metric-card metric-card-amber">
             <div class="metric-card-header">
               <span class="metric-card-title">Pending Cases</span>
               <span class="metric-card-icon">⏳</span>
@@ -249,7 +302,7 @@
             </div>
           </div>
 
-          <div class="metric-card">
+          <div class="metric-card metric-card-green">
             <div class="metric-card-header">
               <span class="metric-card-title">Completed Cases</span>
               <span class="metric-card-icon">✅</span>
@@ -261,7 +314,7 @@
             </div>
           </div>
 
-          <div class="metric-card">
+          <div class="metric-card metric-card-purple">
             <div class="metric-card-header">
               <span class="metric-card-title">Active Investigations</span>
               <span class="metric-card-icon">🔍</span>
@@ -273,7 +326,7 @@
             </div>
           </div>
 
-          <div class="metric-card">
+          <div class="metric-card metric-card-blue">
             <div class="metric-card-header">
               <span class="metric-card-title">Total Uploaded CDRs</span>
               <span class="metric-card-icon">📞</span>
@@ -285,7 +338,7 @@
             </div>
           </div>
 
-          <div class="metric-card">
+          <div class="metric-card metric-card-purple">
             <div class="metric-card-header">
               <span class="metric-card-title">Analyzed Numbers</span>
               <span class="metric-card-icon">👥</span>
@@ -297,7 +350,7 @@
             </div>
           </div>
 
-          <div class="metric-card">
+          <div class="metric-card metric-card-amber">
             <div class="metric-card-header">
               <span class="metric-card-title">Common Numbers</span>
               <span class="metric-card-icon">🔗</span>
@@ -309,7 +362,7 @@
             </div>
           </div>
 
-          <div class="metric-card">
+          <div class="metric-card metric-card-green">
             <div class="metric-card-header">
               <span class="metric-card-title">Locations Tracked</span>
               <span class="metric-card-icon">📡</span>
@@ -698,7 +751,7 @@
           <div class="card-header">
             <div class="card-title">🔗 Cross-Suspect Common Numbers Correlation</div>
             <div style="display: flex; gap: 8px;">
-              <input type="text" id="common-numbers-input" class="form-control" style="width: 320px;" value="9829022222, 9829033333">
+              <input type="text" id="common-numbers-input" class="form-control" style="width: 320px;" placeholder="Comma-separated numbers (e.g. Target 1, Target 2)">
               <button class="btn btn-police btn-sm" onclick="runCommonAnalysis()">Find Shared Contacts</button>
             </div>
           </div>
@@ -716,8 +769,8 @@
             <button class="btn btn-police btn-sm" onclick="runMeetingDetection()">Scan Meetings</button>
           </div>
           <div style="display: flex; gap: 8px; margin-bottom: 14px;">
-            <input type="text" id="meet-num1" class="form-control" value="9829022222" placeholder="Suspect 1">
-            <input type="text" id="meet-num2" class="form-control" value="9829033333" placeholder="Suspect 2">
+            <input type="text" id="meet-num1" class="form-control" placeholder="Suspect 1 Phone">
+            <input type="text" id="meet-num2" class="form-control" placeholder="Suspect 2 Phone">
             <select id="meet-window" class="form-control" style="width: 150px;">
               <option value="30">30 Mins Window</option>
               <option value="60">60 Mins Window</option>
@@ -816,11 +869,8 @@
           <div class="card-header">
             <div class="card-title">📍 Cell Tower Trajectory Map (Rajasthan Police GIS)</div>
             <div style="display: flex; gap: 8px;">
-              <select id="map-suspect-select" class="form-control" style="width: 200px;" onchange="renderTowerMap(this.value)">
-                <option value="9829022222">S1 (9829022222)</option>
-                <option value="9829033333">S2 (9829033333)</option>
-                <option value="9829044444">S3 (9829044444)</option>
-                <option value="9829055555">S4 (9829055555)</option>
+              <select id="map-suspect-select" class="form-control" style="width: 220px;" onchange="renderTowerMap(this.value)">
+                <option value="">-- Select Target --</option>
               </select>
               <button class="btn btn-police btn-sm" onclick="renderTowerMap()">Refresh Map</button>
             </div>
@@ -885,6 +935,149 @@
         </div>
       </section>
 
+      <!-- ================= NEW MODULES MATCHING COMMAND CENTER SIDEBAR ================= -->
+      <section id="view-network-analysis" class="module-view">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header"><div class="card-title">📶 Top Network Hubs (Centrality)</div></div>
+            <div class="table-container">
+              <table>
+                <thead><tr><th>Number</th><th>Total Calls</th><th>Towers</th><th>Duration (s)</th><th>IN/OUT</th></tr></thead>
+                <tbody id="network-hubs-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">🔗 Strongest Communication Trunks</div></div>
+            <div class="table-container">
+              <table>
+                <thead><tr><th>Party A</th><th>Party B</th><th>Calls</th><th>Total Dur (s)</th></tr></thead>
+                <tbody id="network-pairs-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-imei-patterns" class="module-view">
+        <div class="card">
+          <div class="card-header"><div class="card-title">🧬 IMEI Usage &amp; SIM-Binding Patterns</div></div>
+          <div class="table-container">
+            <table>
+              <thead><tr><th>IMEI</th><th>Device</th><th>SIMs</th><th>IMSIs</th><th>Calls</th><th>Pattern Flag</th><th>Numbers</th></tr></thead>
+              <tbody id="imei-patterns-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-imsi-patterns" class="module-view">
+        <div class="card">
+          <div class="card-header"><div class="card-title">🪪 IMSI Rotation &amp; Handset Hopping Patterns</div></div>
+          <div class="table-container">
+            <table>
+              <thead><tr><th>IMSI</th><th>Distinct IMEIs</th><th>Numbers</th><th>Calls</th><th>Pattern Flag</th><th>IMEIs Used</th></tr></thead>
+              <tbody id="imsi-patterns-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-location-summary" class="module-view">
+        <div class="card">
+          <div class="card-header"><div class="card-title">📍 Cell Tower Visitation Summary</div></div>
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Cell ID</th><th>Area Name</th><th>Total Hits</th><th>Unique Targets</th><th>Share %</th><th>First Seen</th><th>Last Seen</th></tr></thead>
+              <tbody id="location-summary-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-location-intelligence" class="module-view">
+        <div class="card">
+          <div class="card-header"><div class="card-title">🧭 Geospatial Location Intelligence Profile</div></div>
+          <div id="location-intel-cards" class="metric-grid-8" style="grid-template-columns: repeat(3, 1fr);"></div>
+        </div>
+      </section>
+
+      <section id="view-day-calls" class="module-view">
+        <div class="card">
+          <div class="card-header"><div class="card-title">🌤️ Daytime Call Records (06:00 - 21:59)</div></div>
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Timestamp</th><th>Caller</th><th>Receiver</th><th>Type</th><th>Dur (s)</th><th>Cell Tower</th><th>Evidence</th></tr></thead>
+              <tbody id="day-calls-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-night-calls" class="module-view">
+        <div class="card">
+          <div class="card-header"><div class="card-title">🌑 Nocturnal Call Records (22:00 - 05:59)</div></div>
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Timestamp</th><th>Caller</th><th>Receiver</th><th>Type</th><th>Dur (s)</th><th>Cell Tower</th><th>Evidence</th></tr></thead>
+              <tbody id="night-calls-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-cell-id-changes" class="module-view">
+        <div class="card">
+          <div class="card-header"><div class="card-title">⇄ Cell ID Transition Log</div></div>
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Seq</th><th>Timestamp</th><th>Target</th><th>From Cell</th><th>To Cell</th><th>Area</th><th>Delta (s)</th></tr></thead>
+              <tbody id="cell-changes-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-location-changes" class="module-view">
+        <div class="card">
+          <div class="card-header"><div class="card-title">🗺️ Geographic Area / City Changes</div></div>
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Seq</th><th>Timestamp</th><th>Target</th><th>From Location</th><th>To Location</th><th>Delta (s)</th></tr></thead>
+              <tbody id="location-changes-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-interactive-timeline" class="module-view">
+        <div class="card">
+          <div class="card-header"><div class="card-title">🕒 Unified Interactive Investigation Timeline (CDR + IPDR)</div></div>
+          <div class="table-container">
+            <table>
+              <thead><tr><th>Timestamp</th><th>Event</th><th>Entity</th><th>Target / Endpoint</th><th>Location / App</th><th>Details</th><th>Evidence</th></tr></thead>
+              <tbody id="interactive-timeline-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-link-analysis" class="module-view">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🔗 Target-to-Target Link Analysis</div>
+            <div style="display:flex; gap:8px;">
+              <input type="text" id="link-num1" class="form-control" style="width:160px;" placeholder="Target 1">
+              <input type="text" id="link-num2" class="form-control" style="width:160px;" placeholder="Target 2">
+              <button class="btn btn-police btn-sm" onclick="runLinkAnalysis()">Analyze Link</button>
+            </div>
+          </div>
+          <div id="link-analysis-results">
+            <p style="color: var(--text-muted); font-size: 13px;">Compare two target numbers to uncover direct calls, shared bridge contacts, and co-visited towers.</p>
+          </div>
+        </div>
+      </section>
+
       <!-- ================= MODULE 21: IPDR ANALYSIS ================= -->
       <section id="view-ipdr" class="module-view">
         <div class="grid-2">
@@ -920,7 +1113,7 @@
                 Lookup All Sessions by Subscriber Number:
               </div>
               <div style="display: flex; gap: 8px;">
-                <input type="text" id="ipdr-sub-input" class="form-control" value="9829022222">
+                <input type="text" id="ipdr-sub-input" class="form-control" placeholder="Enter subscriber MSISDN...">
                 <button class="btn btn-outline btn-sm" onclick="runSubscriberIpdr()">Search</button>
               </div>
             </div>
@@ -961,14 +1154,9 @@
             </div>
           </div>
 
-          <!-- Quick Prompt Chips -->
-          <div class="chips-container">
+          <!-- Dynamic Quick Prompt Chips -->
+          <div class="chips-container" id="assistant-quick-chips">
             <span style="font-size: 11px; color: var(--text-muted); align-self: center;">Quick Questions:</span>
-            <button class="chip-btn" onclick="sendQuickPrompt('Who are the top frequent contacts of S1 9829022222?')">Top contacts S1</button>
-            <button class="chip-btn" onclick="sendQuickPrompt('Find common numbers between S1 9829022222 and S2 9829033333')">Common numbers S1 &amp; S2</button>
-            <button class="chip-btn" onclick="sendQuickPrompt('S3 9829044444 ne kab SIM badla ya IMEI reuse kiya?')">S3 SIM swap check (Hindi)</button>
-            <button class="chip-btn" onclick="sendQuickPrompt('Check night activity for S4 9829055555')">S4 night calls</button>
-            <button class="chip-btn" onclick="sendQuickPrompt('Did S1 9829022222 and S2 9829033333 have a physical meeting at any tower?')">Physical meeting</button>
             <button class="chip-btn" onclick="sendQuickPrompt('Call me kya baat hui aur recording sunao')">Guardrail test (Hindi)</button>
           </div>
 
@@ -1320,21 +1508,7 @@
         <button class="btn btn-outline btn-sm" onclick="toggleNotifsModal()">✕</button>
       </div>
       <div class="modal-body" id="notifs-container">
-        <div style="padding: 10px; background: #0d172c; border-left: 3px solid #ef4444; border-radius: 4px; margin-bottom: 8px;">
-          <b style="color: #fca5a5;">🚨 SIM Swap Detected</b>
-          <p style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">IMEI 356492104581294 swapped between 9829044444 and 9829077777.</p>
-          <small style="color: var(--text-muted);">15 mins ago &bull; Target S3</small>
-        </div>
-        <div style="padding: 10px; background: #0d172c; border-left: 3px solid #f59e0b; border-radius: 4px; margin-bottom: 8px;">
-          <b style="color: #fbbf24;">📍 Meeting Rendezvous Alert</b>
-          <p style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">S1 (9829022222) and S2 (9829033333) co-located at M.I. Road Tower within 12 mins.</p>
-          <small style="color: var(--text-muted);">32 mins ago &bull; Tower RAJ-JPR-002</small>
-        </div>
-        <div style="padding: 10px; background: #0d172c; border-left: 3px solid #10b981; border-radius: 4px;">
-          <b style="color: #34d399;">✅ Data Feed Ingested</b>
-          <p style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">Synthetic CDRs Operator A &amp; B verified and indexed successfully.</p>
-          <small style="color: var(--text-muted);">1 hour ago &bull; 240 rows</small>
-        </div>
+        <p style="color: var(--text-muted); font-size: 12px;">Loading live forensic notifications...</p>
       </div>
       <div class="modal-footer">
         <button class="btn btn-outline" onclick="toggleNotifsModal()">Close</button>

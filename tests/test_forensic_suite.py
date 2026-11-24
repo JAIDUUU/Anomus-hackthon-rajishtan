@@ -387,3 +387,48 @@ def test_api_unauthorized_rejection():
     # Calling without auth token must return 401 or 403
     r = requests.get(f"{BASE_URL}/api/cases/CASE-RAJ-2026-0042/raw-cdr")
     assert r.status_code in (401, 403)
+
+
+def test_analyze_link_between_numbers(db_session):
+    case_id = "CASE-RAJ-2026-0042"
+    res = an.analyze_link_between_numbers(case_id, "9829022222", "9829033333", db_session)
+    assert res["num1"] == "9829022222"
+    assert res["num2"] == "9829033333"
+    assert len(res["shared_contacts"]) >= 2
+    assert "9829011111" in [c["number"] for c in res["shared_contacts"]]
+    assert "shared_towers" in res
+
+
+def test_dynamic_ordered_suspects_fallback(db_session):
+    # Even for a case without brief_data, get_ordered_suspects_for_case must return dynamic targets
+    suspects = an.get_ordered_suspects_for_case("CASE-RAJ-2026-0042", db_session)
+    assert len(suspects) >= 4
+    assert all("phone" in s and s["phone"] for s in suspects)
+
+
+def test_api_extended_analytics_and_notifications(auth_headers):
+    case_id = "CASE-RAJ-2026-0042"
+    r = requests.get(f"{BASE_URL}/api/cases/{case_id}/analytics", headers=auth_headers)
+    assert r.status_code == 200
+    d = r.json()
+    for key in [
+        "suspects", "imei_patterns", "imsi_patterns",
+        "location_summary", "location_intelligence",
+        "day_calls", "night_calls",
+        "cell_id_changes", "location_changes",
+        "interactive_timeline", "network_stats", "notifications"
+    ]:
+        assert key in d, f"Missing dynamic analytics key: {key}"
+    assert len(d["notifications"]) > 0
+    assert len(d["day_calls"]) > 0
+    assert len(d["night_calls"]) > 0
+    assert len(d["interactive_timeline"]) > 0
+
+
+def test_api_link_analysis(auth_headers):
+    case_id = "CASE-RAJ-2026-0042"
+    r = requests.get(f"{BASE_URL}/api/cases/{case_id}/link-analysis?num1=9829022222&num2=9829033333", headers=auth_headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data["shared_contacts"]) >= 2
+

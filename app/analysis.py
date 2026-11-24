@@ -1444,22 +1444,59 @@ def global_search(query: str, case_id: str | None, db: Session) -> dict:
 
 
 # ----------------- ORIGINAL CORE FORENSIC MODULES -----------------
-def get_suspect_numbers_for_case(case_id: str, db: Session) -> set[str]:
+def get_ordered_suspects_for_case(case_id: str, db: Session) -> list[dict]:
+    """Return suspects from case brief, or dynamically derive top active targets from CDRs."""
     c = db.query(Case).filter(Case.id == case_id).first()
-    if not c or not c.brief_data:
-        return set()
-    try:
-        data = json.loads(c.brief_data)
-        suspects = data.get("suspects", [])
-        nums = set()
-        for s in suspects:
-            if s.get("phone"):
-                nums.add(s["phone"])
-            if s.get("new_phone"):
-                nums.add(s["new_phone"])
-        return nums
-    except Exception:
-        return set()
+    if c and c.brief_data:
+        try:
+            data = json.loads(c.brief_data)
+            suspects = data.get("suspects", [])
+            if suspects:
+                return suspects
+        except Exception:
+            pass
+
+    # Dynamic derivation from CDR records when case brief has no predefined suspects
+    rows = db.query(CDRRecord).filter(CDRRecord.case_id == case_id).all()
+    if not rows:
+        return []
+
+    counts = defaultdict(lambda: {"calls": 0, "imeis": set(), "imsis": set()})
+    for r in rows:
+        if r.a_number:
+            counts[r.a_number]["calls"] += 1
+            if r.imei:
+                counts[r.a_number]["imeis"].add(r.imei)
+            if r.imsi:
+                counts[r.a_number]["imsis"].add(r.imsi)
+
+    top_nums = sorted(counts.items(), key=lambda x: x[1]["calls"], reverse=True)[:6]
+    derived = []
+    for idx, (phone, info) in enumerate(top_nums, start=1):
+        imei = sorted(info["imeis"])[0] if info["imeis"] else ""
+        tac = lookup_tac_device(imei) if imei else {}
+        handset = f"{tac.get('brand', 'Unknown')} {tac.get('model', 'Terminal')}".strip() if tac else "Smartphone"
+        derived.append({
+            "id": f"T{idx}",
+            "name": f"Target {idx}",
+            "phone": phone,
+            "role": "Primary Active Subscriber" if idx <= 2 else "Active Contact",
+            "imei": imei,
+            "handset": handset,
+            "notes": f"Dynamically profiled from {info['calls']} CDR transactions."
+        })
+    return derived
+
+
+def get_suspect_numbers_for_case(case_id: str, db: Session) -> set[str]:
+    suspects = get_ordered_suspects_for_case(case_id, db)
+    nums = set()
+    for s in suspects:
+        if s.get("phone"):
+            nums.add(s["phone"])
+        if s.get("new_phone"):
+            nums.add(s["new_phone"])
+    return nums
 
 
 def analyze_communication_patterns(number: str, case_id: str, db: Session) -> dict:
@@ -1987,4 +2024,78 @@ def get_network_graph_data(case_id: str, db: Session, min_calls: int = 1) -> dic
             "total_nodes": len(nodes),
             "total_edges": len(edges)
         }
+    }
+
+
+def analyze_link_between_numbers(case_id: str, num1: str, num2: str, db: Session) -> dict:
+    """
+    Deep link analysis between two numbers: direct calls, shared bridge contacts,
+    shared cell towers, and shared IMEIs.
+    """
+    records = db.query(CDRRecord).filter(CDRRecord.case_id == case_id).all()
+    towers = {t.cell_id: t.area_name for t in db.query(CellTower).all()}
+
+    direct_calls = []
+    contacts_1 = defaultdict(int)
+    contacts_2 = defaultdict(int)
+    towers_1 = set()
+    towers_2 = set()
+    imeis_1 = set()
+    imeis_2 = set()
+
+    for r in records:
+        a, b = r.a_number, r.b_number
+        if (a == num1 and b == num2) or (a == num2 and b == num1):
+            direct_calls.append({
+                "timestamp": r.start_time,
+                "caller": a,
+                "receiver": b,
+                "call_type": r.call_type,
+                "duration_sec": r.duration_sec,
+                "cell_id": r.cell_id,
+                "source_file": r.source_file,
+                "source_row": r.source_row
+            })
+        if a == num1 or b == num1:
+            other = b if a == num1 else a
+            if other and other != num1 and other != num2:
+                contacts_1[other] += 1
+            if r.cell_id and a == num1:
+                towers_1.add(r.cell_id)
+            if r.imei and a == num1:
+                imeis_1.add(r.imei)
+        if a == num2 or b == num2:
+            other = b if a == num2 else a
+            if other and other != num1 and other != num2:
+                contacts_2[other] += 1
+            if r.cell_id and a == num2:
+                towers_2.add(r.cell_id)
+            if r.imei and a == num2:
+                imeis_2.add(r.imei)
+
+    shared_contacts = []
+    for num in set(contacts_1.keys()) & set(contacts_2.keys()):
+        shared_contacts.append({
+            "number": num,
+            "calls_with_num1": contacts_1[num],
+            "calls_with_num2": contacts_2[num],
+            "total_bridge_calls": contacts_1[num] + contacts_2[num]
+        })
+    shared_contacts.sort(key=lambda x: x["total_bridge_calls"], reverse=True)
+
+    shared_towers = [
+        {"cell_id": cid, "area_name": towers.get(cid, cid)}
+        for cid in sorted(towers_1 & towers_2)
+    ]
+    shared_imeis = sorted(imeis_1 & imeis_2)
+
+    return {
+        "num1": num1,
+        "num2": num2,
+        "direct_calls_count": len(direct_calls),
+        "direct_calls": direct_calls[:30],
+        "shared_contacts": shared_contacts,
+        "shared_towers": shared_towers,
+        "shared_imeis": shared_imeis,
+        "link_strength": "DIRECT" if direct_calls else ("BRIDGE_CONNECTED" if shared_contacts else "NONE")
     }

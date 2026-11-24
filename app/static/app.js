@@ -25,13 +25,32 @@ let cachedAnalytics = null;
 
 // ----------------- DOM READY INITIALIZATION -----------------
 document.addEventListener("DOMContentLoaded", async () => {
+  initTheme();
   startLiveClock();
   setupKeyboardShortcuts();
   await initSession();
   await loadCasesList();
   await loadAvailableMappings();
   await loadExecutiveMetrics();
+  await getCaseAnalytics();
 });
+
+// ----------------- DARK / LIGHT THEME TOGGLE -----------------
+function initTheme() {
+  const saved = localStorage.getItem("forensic-theme") || "dark";
+  document.documentElement.setAttribute("data-theme", saved);
+  const btn = document.getElementById("btn-theme-toggle");
+  if (btn) btn.innerText = saved === "light" ? "🌙" : "☀️";
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute("data-theme") || "dark";
+  const next = current === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+  localStorage.setItem("forensic-theme", next);
+  const btn = document.getElementById("btn-theme-toggle");
+  if (btn) btn.innerText = next === "light" ? "🌙" : "☀️";
+}
 
 // ----------------- REAL-TIME LIVE TICKING CLOCK (IST) -----------------
 function startLiveClock() {
@@ -217,8 +236,13 @@ async function changeActiveCase(caseId) {
 
 async function onCaseSelected(caseId) {
   cachedAnalytics = null;
+  ["common-numbers-input", "meet-num1", "meet-num2", "link-num1", "link-num2", "ipdr-sub-input"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
   await loadExecutiveMetrics(caseId);
   await loadCaseDetails(caseId);
+  await getCaseAnalytics();
 
   // Refresh whatever active view is open
   const activeView = document.querySelector(".module-view.active");
@@ -404,6 +428,39 @@ function dispatchViewLoad(viewName) {
     case "night-locations":
       loadNightLocationsView();
       break;
+    case "network-analysis":
+      loadNetworkAnalysisView();
+      break;
+    case "imei-patterns":
+      loadImeiPatternsView();
+      break;
+    case "imsi-patterns":
+      loadImsiPatternsView();
+      break;
+    case "location-summary":
+      loadLocationSummaryView();
+      break;
+    case "location-intelligence":
+      loadLocationIntelView();
+      break;
+    case "day-calls":
+      loadDayCallsView();
+      break;
+    case "night-calls":
+      loadNightCallsView();
+      break;
+    case "cell-id-changes":
+      loadCellChangesView();
+      break;
+    case "location-changes":
+      loadLocationChangesView();
+      break;
+    case "interactive-timeline":
+      loadInteractiveTimelineView();
+      break;
+    case "link-analysis":
+      runLinkAnalysis();
+      break;
     case "assistant":
       loadObservations();
       break;
@@ -419,12 +476,14 @@ function dispatchViewLoad(viewName) {
 // ----------------- FETCH CACHED ANALYTICS -----------------
 async function getCaseAnalytics() {
   if (cachedAnalytics) return cachedAnalytics;
+  if (!currentCaseId) return null;
   try {
     const res = await fetch(`/api/cases/${currentCaseId}/analytics`, {
       headers: { "Authorization": `Bearer ${currentToken}` }
     });
     if (res.ok) {
       cachedAnalytics = await res.json();
+      populateDynamicCaseUI(cachedAnalytics);
       return cachedAnalytics;
     }
   } catch (e) {
@@ -1239,7 +1298,9 @@ async function runDeviceChangeDetection() {
 
 // ----------------- MODULE: GEO MAP (LEAFLET) -----------------
 async function renderTowerMap(targetNum = null) {
-  const num = targetNum || document.getElementById("map-suspect-select").value || "9829022222";
+  const sel = document.getElementById("map-suspect-select");
+  const num = targetNum || (sel ? sel.value : "") || (cachedAnalytics?.suspects?.[0]?.phone || "");
+  if (!num) return;
   const countLabel = document.getElementById("map-event-count");
   countLabel.innerText = "Querying location timeline...";
 
@@ -2052,5 +2113,281 @@ async function saveCustomMapping() {
     }
   } catch (e) {
     alert("Failed to save mapping.");
+  }
+}
+
+// ----------------- DYNAMIC CASE UI POPULATION (ZERO HARDCODING) -----------------
+function populateDynamicCaseUI(analytics) {
+  if (!analytics) return;
+  const suspects = analytics.suspects || [];
+  const p1 = suspects[0]?.phone || "";
+  const p2 = suspects[1]?.phone || "";
+  const p3 = suspects[2]?.phone || "";
+  const p4 = suspects[3]?.phone || "";
+
+  // Populate map suspect selector dynamically
+  const mapSel = document.getElementById("map-suspect-select");
+  if (mapSel) {
+    mapSel.innerHTML = suspects.length
+      ? suspects.map(s => `<option value="${s.phone}">${s.name || s.id} (${s.phone})</option>`).join("")
+      : `<option value="">No targets available</option>`;
+  }
+
+  // Dynamically seed inputs if empty
+  const setIfEmpty = (id, val) => {
+    const el = document.getElementById(id);
+    if (el && !el.value && val) el.value = val;
+  };
+  if (p1 && p2) {
+    setIfEmpty("common-numbers-input", `${p1}, ${p2}`);
+    setIfEmpty("meet-num1", p1);
+    setIfEmpty("meet-num2", p2);
+    setIfEmpty("link-num1", p1);
+    setIfEmpty("link-num2", p2);
+  }
+  setIfEmpty("ipdr-sub-input", p1);
+
+  // Dynamic AI quick chips based on active targets
+  const chipsEl = document.getElementById("assistant-quick-chips");
+  if (chipsEl) {
+    let html = `<span style="font-size: 11px; color: var(--text-muted); align-self: center;">Quick Questions:</span>`;
+    if (p1) html += `<button class="chip-btn" onclick="sendQuickPrompt('Who are the top frequent contacts of ${p1}?')">Top contacts (${p1})</button>`;
+    if (p1 && p2) html += `<button class="chip-btn" onclick="sendQuickPrompt('Find common numbers between ${p1} and ${p2}')">Common numbers</button>`;
+    if (p3) html += `<button class="chip-btn" onclick="sendQuickPrompt('${p3} ne kab SIM badla ya IMEI reuse kiya?')">SIM swap check (Hindi)</button>`;
+    if (p4 || p1) html += `<button class="chip-btn" onclick="sendQuickPrompt('Check night activity for ${p4 || p1}')">Night calls</button>`;
+    if (p1 && p2) html += `<button class="chip-btn" onclick="sendQuickPrompt('Did ${p1} and ${p2} have a physical meeting at any tower?')">Physical meeting</button>`;
+    html += `<button class="chip-btn" onclick="sendQuickPrompt('Call me kya baat hui aur recording sunao')">Guardrail test (Hindi)</button>`;
+    chipsEl.innerHTML = html;
+  }
+
+  // Dynamic Notifications
+  const notifs = analytics.notifications || [];
+  const badge = document.getElementById("notif-badge");
+  const container = document.getElementById("notifs-container");
+  if (badge) badge.innerText = notifs.length;
+  if (container) {
+    if (!notifs.length) {
+      container.innerHTML = `<p style="color: var(--text-muted); font-size: 12px;">No anomaly alerts detected for this case.</p>`;
+    } else {
+      const colors = { critical: "#ef4444", warning: "#f59e0b", info: "#10b981" };
+      const icons = { critical: "🚨", warning: "📍", info: "✅" };
+      container.innerHTML = notifs.map(n => `
+        <div style="padding: 10px; background: var(--bg-card-subtle); border-left: 3px solid ${colors[n.severity] || '#38bdf8'}; border-radius: 4px; margin-bottom: 8px;">
+          <b style="color: ${colors[n.severity] || '#38bdf8'};">${icons[n.severity] || '🔔'} ${n.title}</b>
+          <p style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">${n.message}</p>
+          <small style="color: var(--text-muted);">${n.meta || ""}</small>
+        </div>
+      `).join("");
+    }
+  }
+}
+
+// ----------------- SHARED TABLE HELPERS -----------------
+function renderCallTableRows(tbodyId, rows) {
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+  if (!rows || !rows.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);">No matching calls found.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td style="font-family:monospace;font-size:11px;">${r.timestamp}</td>
+      <td><b>${r.a_number}</b></td>
+      <td>${r.b_number}</td>
+      <td><span class="metric-card-badge badge-blue">${r.call_type}</span></td>
+      <td>${r.duration_sec}s</td>
+      <td><small>${r.cell_id} (${r.area_name})</small></td>
+      <td><span class="evidence-chip" onclick="openEvidenceModal('${r.source_file}', ${r.source_row})">${r.source_file}:R${r.source_row}</span></td>
+    </tr>
+  `).join("");
+}
+
+function renderHopTableRows(tbodyId, rows, areaOnly) {
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+  if (!rows || !rows.length) {
+    tbody.innerHTML = `<tr><td colspan="${areaOnly ? 6 : 7}" style="text-align:center;color:var(--text-muted);">No transitions detected.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map(h => areaOnly ? `
+    <tr>
+      <td>${h.seq}</td>
+      <td style="font-family:monospace;font-size:11px;">${h.timestamp}</td>
+      <td><b>${h.number}</b></td>
+      <td>${h.from_area}</td>
+      <td style="color:#38bdf8;font-weight:600;">${h.area_name}</td>
+      <td>${h.time_delta_sec}s</td>
+    </tr>
+  ` : `
+    <tr>
+      <td>${h.seq}</td>
+      <td style="font-family:monospace;font-size:11px;">${h.timestamp}</td>
+      <td><b>${h.number}</b></td>
+      <td style="font-family:monospace;">${h.from_cell}</td>
+      <td style="font-family:monospace;color:#38bdf8;font-weight:600;">${h.cell_id}</td>
+      <td>${h.area_name}</td>
+      <td>${h.time_delta_sec}s</td>
+    </tr>
+  `).join("");
+}
+
+// ----------------- NEW SIDEBAR MODULE RENDERERS -----------------
+async function loadNetworkAnalysisView() {
+  const d = await getCaseAnalytics();
+  if (!d || !d.network_stats) return;
+  const hubsBody = document.getElementById("network-hubs-tbody");
+  const pairsBody = document.getElementById("network-pairs-tbody");
+  if (hubsBody) {
+    hubsBody.innerHTML = (d.network_stats.top_hubs || []).map(h => `
+      <tr><td><b>${h.number}</b></td><td>${h.calls}</td><td>${h.unique_towers}</td><td>${h.duration}s</td><td>${h.in_out}</td></tr>
+    `).join("") || `<tr><td colspan="5">No data</td></tr>`;
+  }
+  if (pairsBody) {
+    pairsBody.innerHTML = (d.network_stats.top_pairs || []).map(p => `
+      <tr><td><b>${p.source}</b></td><td><b>${p.target}</b></td><td><span class="metric-card-badge badge-amber">${p.calls}</span></td><td>${p.duration}s</td></tr>
+    `).join("") || `<tr><td colspan="4">No data</td></tr>`;
+  }
+}
+
+async function loadImeiPatternsView() {
+  const d = await getCaseAnalytics();
+  const tbody = document.getElementById("imei-patterns-tbody");
+  if (!d || !tbody) return;
+  tbody.innerHTML = (d.imei_patterns || []).map(p => `
+    <tr>
+      <td style="font-family:monospace;color:#38bdf8;">${p.imei}</td>
+      <td>${p.device}</td>
+      <td><b>${p.distinct_sims}</b></td>
+      <td>${p.distinct_imsis}</td>
+      <td>${p.calls}</td>
+      <td><span class="metric-card-badge ${p.pattern_flag === 'MULTI_SIM_SWAP' ? 'badge-amber' : 'badge-blue'}">${p.pattern_flag}</span></td>
+      <td><small>${p.numbers.join(", ")}</small></td>
+    </tr>
+  `).join("") || `<tr><td colspan="7">No IMEI patterns</td></tr>`;
+}
+
+async function loadImsiPatternsView() {
+  const d = await getCaseAnalytics();
+  const tbody = document.getElementById("imsi-patterns-tbody");
+  if (!d || !tbody) return;
+  tbody.innerHTML = (d.imsi_patterns || []).map(p => `
+    <tr>
+      <td style="font-family:monospace;color:#38bdf8;">${p.imsi}</td>
+      <td><b>${p.distinct_imeis}</b></td>
+      <td>${p.distinct_numbers}</td>
+      <td>${p.calls}</td>
+      <td><span class="metric-card-badge ${p.pattern_flag === 'MULTI_HANDSET_HOP' ? 'badge-amber' : 'badge-green'}">${p.pattern_flag}</span></td>
+      <td><small style="font-family:monospace;">${p.imeis.join(", ")}</small></td>
+    </tr>
+  `).join("") || `<tr><td colspan="6">No IMSI patterns</td></tr>`;
+}
+
+async function loadLocationSummaryView() {
+  const d = await getCaseAnalytics();
+  const tbody = document.getElementById("location-summary-tbody");
+  if (!d || !tbody) return;
+  tbody.innerHTML = (d.location_summary || []).map(l => `
+    <tr>
+      <td style="font-family:monospace;color:#fbbf24;">${l.cell_id}</td>
+      <td><b>${l.area_name}</b></td>
+      <td>${l.hits}</td>
+      <td>${l.unique_numbers}</td>
+      <td><span class="metric-card-badge badge-blue">${l.pct}%</span></td>
+      <td style="font-size:11px;font-family:monospace;">${l.first_seen}</td>
+      <td style="font-size:11px;font-family:monospace;">${l.last_seen}</td>
+    </tr>
+  `).join("") || `<tr><td colspan="7">No tower data</td></tr>`;
+}
+
+async function loadLocationIntelView() {
+  const d = await getCaseAnalytics();
+  const box = document.getElementById("location-intel-cards");
+  if (!d || !d.location_intelligence || !box) return;
+  const li = d.location_intelligence;
+  box.innerHTML = `
+    <div class="metric-card metric-card-blue"><div class="metric-card-title">Unique Cell Towers</div><div class="metric-card-val">${li.total_unique_towers || 0}</div><div class="metric-card-footer"><span>Active Sites</span></div></div>
+    <div class="metric-card metric-card-amber"><div class="metric-card-title">Daytime Base Tower</div><div class="metric-card-val" style="font-size:16px;">${li.primary_day_tower ? li.primary_day_tower.area_name : '-'}</div><div class="metric-card-footer"><span>${li.primary_day_tower ? li.primary_day_tower.visits + ' hits' : ''}</span></div></div>
+    <div class="metric-card metric-card-purple"><div class="metric-card-title">Nighttime Residence Tower</div><div class="metric-card-val" style="font-size:16px;">${li.primary_night_tower ? li.primary_night_tower.area_name : '-'}</div><div class="metric-card-footer"><span>${li.primary_night_tower ? li.primary_night_tower.visits + ' hits' : ''}</span></div></div>
+    <div class="metric-card metric-card-green"><div class="metric-card-title">Most Visited Tower</div><div class="metric-card-val" style="font-size:16px;">${li.most_visited_tower ? li.most_visited_tower.cell_id : '-'}</div><div class="metric-card-footer"><span>${li.most_visited_tower ? li.most_visited_tower.area_name : ''}</span></div></div>
+    <div class="metric-card metric-card-blue"><div class="metric-card-title">Total Cell Hops</div><div class="metric-card-val">${li.total_tower_hops || 0}</div><div class="metric-card-footer"><span>Tower Transitions</span></div></div>
+    <div class="metric-card metric-card-amber"><div class="metric-card-title">Area Changes</div><div class="metric-card-val">${li.total_area_transitions || 0}</div><div class="metric-card-footer"><span>City/Sector Shifts</span></div></div>
+  `;
+}
+
+async function loadDayCallsView() {
+  const d = await getCaseAnalytics();
+  if (d) renderCallTableRows("day-calls-tbody", d.day_calls);
+}
+
+async function loadNightCallsView() {
+  const d = await getCaseAnalytics();
+  if (d) renderCallTableRows("night-calls-tbody", d.night_calls);
+}
+
+async function loadCellChangesView() {
+  const d = await getCaseAnalytics();
+  if (d) renderHopTableRows("cell-changes-tbody", d.cell_id_changes, false);
+}
+
+async function loadLocationChangesView() {
+  const d = await getCaseAnalytics();
+  if (d) renderHopTableRows("location-changes-tbody", d.location_changes, true);
+}
+
+async function loadInteractiveTimelineView() {
+  const d = await getCaseAnalytics();
+  const tbody = document.getElementById("interactive-timeline-tbody");
+  if (!d || !tbody) return;
+  tbody.innerHTML = (d.interactive_timeline || []).map(ev => `
+    <tr>
+      <td style="font-family:monospace;font-size:11px;">${ev.timestamp}</td>
+      <td><span class="metric-card-badge ${ev.event_type.startsWith('IPDR') ? 'badge-purple' : 'badge-blue'}">${ev.event_type}</span></td>
+      <td><b>${ev.entity}</b></td>
+      <td>${ev.target}</td>
+      <td>${ev.location}</td>
+      <td><small>${ev.details}</small></td>
+      <td><small style="color:#38bdf8;">${ev.evidence}</small></td>
+    </tr>
+  `).join("") || `<tr><td colspan="7">No timeline events</td></tr>`;
+}
+
+async function runLinkAnalysis() {
+  const d = await getCaseAnalytics();
+  const n1El = document.getElementById("link-num1");
+  const n2El = document.getElementById("link-num2");
+  if (d && d.suspects && d.suspects.length >= 2) {
+    if (n1El && !n1El.value) n1El.value = d.suspects[0].phone;
+    if (n2El && !n2El.value) n2El.value = d.suspects[1].phone;
+  }
+  const num1 = n1El ? n1El.value.trim() : "";
+  const num2 = n2El ? n2El.value.trim() : "";
+  const box = document.getElementById("link-analysis-results");
+  if (!num1 || !num2 || !box || !currentCaseId) return;
+
+  try {
+    const res = await fetch(`/api/cases/${currentCaseId}/link-analysis?num1=${encodeURIComponent(num1)}&num2=${encodeURIComponent(num2)}`, {
+      headers: { "Authorization": `Bearer ${currentToken}` }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    box.innerHTML = `
+      <div class="metric-grid-8" style="grid-template-columns: repeat(4, 1fr); margin-bottom:12px;">
+        <div class="metric-card metric-card-blue"><div class="metric-card-title">Link Status</div><div class="metric-card-val" style="font-size:16px;">${data.link_strength}</div></div>
+        <div class="metric-card metric-card-amber"><div class="metric-card-title">Direct Calls</div><div class="metric-card-val">${data.direct_calls_count}</div></div>
+        <div class="metric-card metric-card-purple"><div class="metric-card-title">Shared Bridge Contacts</div><div class="metric-card-val">${data.shared_contacts.length}</div></div>
+        <div class="metric-card metric-card-green"><div class="metric-card-title">Shared Cell Towers</div><div class="metric-card-val">${data.shared_towers.length}</div></div>
+      </div>
+      <div class="table-container">
+        <table>
+          <thead><tr><th>Bridge Contact</th><th>Calls w/ ${num1}</th><th>Calls w/ ${num2}</th><th>Total Bridge Calls</th></tr></thead>
+          <tbody>
+            ${data.shared_contacts.map(c => `<tr><td><b>${c.number}</b></td><td>${c.calls_with_num1}</td><td>${c.calls_with_num2}</td><td><span class="metric-card-badge badge-amber">${c.total_bridge_calls}</span></td></tr>`).join("") || '<tr><td colspan="4">No shared contacts found.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (e) {
+    box.innerHTML = `<p style="color:#fca5a5;">Error running link analysis.</p>`;
   }
 }

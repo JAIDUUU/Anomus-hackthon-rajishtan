@@ -27,6 +27,7 @@ from app.analysis import (
     analyze_communication_patterns, find_common_numbers,
     get_location_timeline, detect_meetings, detect_imei_sim_changes,
     get_network_graph_data, get_suspect_numbers_for_case,
+    get_ordered_suspects_for_case, analyze_link_between_numbers,
     lookup_tac_device, get_executive_metrics, get_raw_cdr_records,
     get_mfc_analysis, get_day_night_analysis, get_first_last_calls,
     get_missing_dates_analysis, get_movement_and_cell_changes,
@@ -1066,6 +1067,17 @@ def get_global_search(
 
 
 # ----------------- FORENSIC ANALYTICS AGGREGATION -----------------
+@app.get("/api/cases/{case_id}/link-analysis")
+def get_link_analysis_endpoint(
+    case_id: str,
+    num1: str = Query(...),
+    num2: str = Query(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("investigating_officer", "senior_officer", "admin"))
+):
+    return analyze_link_between_numbers(case_id, num1.strip(), num2.strip(), db)
+
+
 @app.get("/api/cases/{case_id}/analytics")
 def get_case_analytics(
     case_id: str,
@@ -1073,16 +1085,20 @@ def get_case_analytics(
     current_user: User = Depends(require_role("investigating_officer", "senior_officer", "admin"))
 ):
     records = db.query(CDRRecord).filter(CDRRecord.case_id == case_id).order_by(CDRRecord.start_time.asc()).all()
+    ipdr_records = db.query(IPDRRecord).filter(IPDRRecord.case_id == case_id).order_by(IPDRRecord.session_start.asc()).all()
     towers = {t.cell_id: t for t in db.query(CellTower).all()}
-    case_obj = db.query(Case).filter(Case.id == case_id).first()
-    brief = json.loads(case_obj.brief_data) if (case_obj and case_obj.brief_data) else {}
+    suspects_list = get_ordered_suspects_for_case(case_id, db)
 
     if not records:
         return {
+            "suspects": suspects_list,
             "mfc": [], "first_last": [], "day_night": {"day_calls": 0, "night_calls": 0, "day_pct": 0, "night_pct": 0, "night_numbers": []},
             "day_locations": [], "night_locations": [], "missing_dates": [], "movement": [],
             "service_numbers": [], "international_numbers": [], "imei_summary": [], "imsi_summary": [],
-            "ownership": brief.get("suspects", [])
+            "imei_patterns": [], "imsi_patterns": [], "location_summary": [], "location_intelligence": {},
+            "day_calls": [], "night_calls": [], "cell_id_changes": [], "location_changes": [],
+            "interactive_timeline": [], "network_stats": {"top_hubs": [], "top_pairs": []},
+            "notifications": [], "ownership": suspects_list
         }
 
     contact_stats = defaultdict(lambda: {
@@ -1091,15 +1107,23 @@ def get_case_analytics(
     })
     tower_day = defaultdict(int)
     tower_night = defaultdict(int)
+    tower_meta = defaultdict(lambda: {"hits": 0, "numbers": set(), "first_seen": None, "last_seen": None})
     imei_stats = defaultdict(lambda: {"calls": 0, "numbers": set(), "imsis": set(), "first_seen": None, "last_seen": None})
     imsi_stats = defaultdict(lambda: {"calls": 0, "numbers": set(), "imeis": set(), "first_seen": None, "last_seen": None})
+    pair_stats = defaultdict(lambda: {"calls": 0, "duration": 0})
     
     day_calls_count = 0
     night_calls_count = 0
+    day_calls_list = []
+    night_calls_list = []
     all_dates = set()
     movement_hops = []
+    cell_id_changes = []
+    location_changes = []
     last_tower = None
+    last_area = None
     last_time = None
+    timeline_events = []
 
     for r in records:
         a, b = r.a_number, r.b_number
@@ -1109,6 +1133,8 @@ def get_case_analytics(
         imei = r.imei
         imsi = r.imsi
         cell = r.cell_id
+        t_obj = towers.get(cell)
+        area_name = t_obj.area_name if t_obj else (f"Cell {cell}" if cell else "Unknown")
 
         # date extraction
         try:
@@ -1119,15 +1145,57 @@ def get_case_analytics(
             dt = None
             hour = 12
 
+        if a and b and a != b:
+            pk = tuple(sorted([a, b]))
+            pair_stats[pk]["calls"] += 1
+            pair_stats[pk]["duration"] += dur
+
+        if cell:
+            tm = tower_meta[cell]
+            tm["hits"] += 1
+            if a:
+                tm["numbers"].add(a)
+            if not tm["first_seen"] or st < tm["first_seen"]:
+                tm["first_seen"] = st
+            if not tm["last_seen"] or st > tm["last_seen"]:
+                tm["last_seen"] = st
+
+        call_row = {
+            "timestamp": st,
+            "a_number": a,
+            "b_number": b,
+            "call_type": call_type,
+            "duration_sec": dur,
+            "cell_id": cell or "-",
+            "area_name": area_name,
+            "source_file": r.source_file,
+            "source_row": r.source_row
+        }
+
         is_night = (hour >= 22 or hour < 6)
         if is_night:
             night_calls_count += 1
+            if len(night_calls_list) < 100:
+                night_calls_list.append(call_row)
             if cell:
                 tower_night[cell] += 1
         else:
             day_calls_count += 1
+            if len(day_calls_list) < 100:
+                day_calls_list.append(call_row)
             if cell:
                 tower_day[cell] += 1
+
+        if len(timeline_events) < 80:
+            timeline_events.append({
+                "timestamp": st,
+                "event_type": f"CDR_{call_type}",
+                "entity": a,
+                "target": b,
+                "location": area_name,
+                "details": f"{call_type} {dur}s via {cell or '-'}",
+                "evidence": f"{r.source_file}:Row {r.source_row}"
+            })
 
         # Track contact stats
         for num, is_a in [(a, True), (b, False)]:
@@ -1178,23 +1246,31 @@ def get_case_analytics(
             if not iss["last_seen"] or st > iss["last_seen"]:
                 iss["last_seen"] = st
 
-        # Tower movement hop
+        # Tower movement hop & Cell ID / Location changes
         if cell and cell != last_tower:
             delta_sec = 0
             if dt and last_time:
                 delta_sec = int((dt - last_time).total_seconds())
             t_obj = towers.get(cell)
-            movement_hops.append({
+            hop = {
                 "seq": len(movement_hops) + 1,
                 "timestamp": st,
+                "from_cell": last_tower or "-",
                 "cell_id": cell,
-                "area_name": t_obj.area_name if t_obj else "Cell " + cell,
+                "from_area": last_area or "-",
+                "area_name": area_name,
                 "lat": t_obj.lat if t_obj else None,
                 "lon": t_obj.lon if t_obj else None,
                 "number": a,
                 "time_delta_sec": delta_sec
-            })
+            }
+            movement_hops.append(hop)
+            if last_tower and len(cell_id_changes) < 100:
+                cell_id_changes.append(hop)
+            if last_area and area_name != last_area and len(location_changes) < 100:
+                location_changes.append(hop)
             last_tower = cell
+            last_area = area_name
             last_time = dt
 
     total_all_calls = len(records)
@@ -1327,7 +1403,115 @@ def get_case_analytics(
         })
     imsi_summary.sort(key=lambda x: x["calls"], reverse=True)
 
+    # 9. IMEI & IMSI Patterns (Multi-SIM / Multi-IMEI Anomaly & Usage Patterns)
+    imei_patterns = [
+        {
+            "imei": item["imei"],
+            "device": f"{item['brand']} {item['model']}",
+            "distinct_sims": len(item["associated_numbers"]),
+            "distinct_imsis": len(item["associated_imsis"]),
+            "calls": item["calls"],
+            "pattern_flag": "MULTI_SIM_SWAP" if len(item["associated_numbers"]) > 1 else "SINGLE_SIM_BINDING",
+            "numbers": item["associated_numbers"],
+            "span": f"{item['first_seen']} -> {item['last_seen']}"
+        }
+        for item in imei_summary
+    ]
+    imsi_patterns = [
+        {
+            "imsi": item["imsi"],
+            "distinct_imeis": len(item["associated_imeis"]),
+            "distinct_numbers": len(item["associated_numbers"]),
+            "calls": item["calls"],
+            "pattern_flag": "MULTI_HANDSET_HOP" if len(item["associated_imeis"]) > 1 else "CONSISTENT_DEVICE",
+            "imeis": item["associated_imeis"],
+            "span": f"{item['first_seen']} -> {item['last_seen']}"
+        }
+        for item in imsi_summary
+    ]
+
+    # 10. Location Summary & Location Intelligence
+    total_hits = sum(tm["hits"] for tm in tower_meta.values())
+    location_summary = []
+    for cid, tm in sorted(tower_meta.items(), key=lambda x: x[1]["hits"], reverse=True):
+        t_obj = towers.get(cid)
+        location_summary.append({
+            "cell_id": cid,
+            "area_name": t_obj.area_name if t_obj else f"Cell {cid}",
+            "hits": tm["hits"],
+            "unique_numbers": len(tm["numbers"]),
+            "pct": round((tm["hits"] / max(1, total_hits)) * 100, 1),
+            "first_seen": tm["first_seen"],
+            "last_seen": tm["last_seen"],
+            "lat": t_obj.lat if t_obj else None,
+            "lon": t_obj.lon if t_obj else None
+        })
+
+    location_intelligence = {
+        "total_unique_towers": len(tower_meta),
+        "primary_day_tower": day_locs[0] if day_locs else None,
+        "primary_night_tower": night_locs[0] if night_locs else None,
+        "most_visited_tower": location_summary[0] if location_summary else None,
+        "total_tower_hops": len(cell_id_changes),
+        "total_area_transitions": len(location_changes)
+    }
+
+    # 11. Interactive Timeline (CDR + IPDR combined chronologically)
+    for ipr in ipdr_records[:30]:
+        timeline_events.append({
+            "timestamp": ipr.session_start,
+            "event_type": "IPDR_SESSION",
+            "entity": ipr.subscriber_number,
+            "target": f"{ipr.source_ip}:{ipr.source_port}",
+            "location": ipr.app_hint or "CGNAT Session",
+            "details": f"App: {ipr.app_hint or 'Data'} ({ipr.bytes_transferred} B)",
+            "evidence": f"{ipr.source_file}:Row {ipr.source_row}"
+        })
+    timeline_events.sort(key=lambda x: x["timestamp"], reverse=True)
+
+    # 12. Network Analysis Stats
+    top_hubs = [
+        {"number": num, "calls": s["calls"], "unique_towers": len(s["towers"]), "duration": s["duration"], "in_out": f"{s['in']}/{s['out']}"}
+        for num, s in sorted(contact_stats.items(), key=lambda x: x[1]["calls"], reverse=True)[:15]
+    ]
+    top_pairs = [
+        {"source": p[0], "target": p[1], "calls": st["calls"], "duration": st["duration"]}
+        for p, st in sorted(pair_stats.items(), key=lambda x: x[1]["calls"], reverse=True)[:20]
+    ]
+
+    # 13. Dynamic Notifications derived from actual forensic findings
+    notifications = []
+    dev_changes = detect_imei_sim_changes(case_id, db)
+    for sw in dev_changes.get("multi_number_imeis", [])[:3]:
+        notifications.append({
+            "severity": "critical",
+            "title": "SIM Swap Detected",
+            "message": f"IMEI {sw['imei']} swapped across {sw['distinct_numbers_count']} numbers: {', '.join(sw['numbers'])}.",
+            "meta": "Multi-SIM Hardware Alert"
+        })
+    if len(suspects_list) >= 2:
+        n1, n2 = suspects_list[0].get("phone"), suspects_list[1].get("phone")
+        if n1 and n2:
+            meets = detect_meetings(n1, n2, case_id, db, time_window_minutes=30)
+            for m in meets[:2]:
+                diff_mins = round(m["time_diff_sec"] / 60, 1)
+                notifications.append({
+                    "severity": "warning",
+                    "title": "Physical Co-Location Alert",
+                    "message": f"{n1} and {n2} co-located at {m['area_name']} ({m['cell_id']}) within {diff_mins} mins.",
+                    "meta": m["event_target_1"]["timestamp"]
+                })
+    latest_batch = db.query(ImportBatch).filter(ImportBatch.case_id == case_id).order_by(ImportBatch.created_at.desc()).first()
+    if latest_batch:
+        notifications.append({
+            "severity": "info",
+            "title": "Data Ingestion Active",
+            "message": f"{latest_batch.filename} ({latest_batch.file_type}): {latest_batch.valid_rows} valid rows indexed ({latest_batch.rejected_rows} rejected).",
+            "meta": latest_batch.mapping_name or "Normalized"
+        })
+
     return {
+        "suspects": suspects_list,
         "mfc": mfc_list,
         "first_last": first_last_list,
         "day_night": {
@@ -1337,15 +1521,26 @@ def get_case_analytics(
             "night_pct": night_pct,
             "night_numbers": night_numbers[:20]
         },
+        "day_calls": day_calls_list,
+        "night_calls": night_calls_list,
         "day_locations": day_locs[:15],
         "night_locations": night_locs[:15],
+        "location_summary": location_summary[:25],
+        "location_intelligence": location_intelligence,
         "missing_dates": missing_dates,
         "movement": movement_hops[:40],
+        "cell_id_changes": cell_id_changes,
+        "location_changes": location_changes,
+        "interactive_timeline": timeline_events[:80],
+        "network_stats": {"top_hubs": top_hubs, "top_pairs": top_pairs},
         "service_numbers": service_numbers,
         "international_numbers": international_numbers,
         "imei_summary": imei_summary,
         "imsi_summary": imsi_summary,
-        "ownership": brief.get("suspects", [])
+        "imei_patterns": imei_patterns,
+        "imsi_patterns": imsi_patterns,
+        "notifications": notifications,
+        "ownership": suspects_list
     }
 
 
