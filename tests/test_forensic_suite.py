@@ -1,30 +1,7 @@
 import pytest
-import requests
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
-from app.db import Base, Case, CDRRecord, IPDRRecord, CellTower, SessionLocal
 import app.analysis as an
 
-BASE_URL = "http://127.0.0.1:8000"
-
-
-@pytest.fixture
-def auth_headers():
-    res = requests.post(f"{BASE_URL}/api/auth/login", json={
-        "username": "io_sharma",
-        "password": "IO@RajPolice2026"
-    })
-    assert res.status_code == 200
-    token = res.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
-
-
-@pytest.fixture
-def db_session():
-    db = SessionLocal()
-    yield db
-    db.close()
+# Uses isolated `client`, `auth_headers`, `db_session` fixtures from tests/conftest.py
 
 
 # ----------------- UNIT TESTS: ANALYSIS FUNCTIONS -----------------
@@ -252,9 +229,9 @@ def test_global_search(db_session):
 
 
 # ----------------- INTEGRATION TESTS: HTTP API ENDPOINTS -----------------
-def test_api_dashboard_metrics(auth_headers):
+def test_api_dashboard_metrics(client, auth_headers):
     # With case_id
-    r1 = requests.get(f"{BASE_URL}/api/dashboard/metrics?case_id=CASE-RAJ-2026-0042", headers=auth_headers)
+    r1 = client.get("/api/dashboard/metrics?case_id=CASE-RAJ-2026-0042", headers=auth_headers)
     assert r1.status_code == 200
     d1 = r1.json()
     assert d1["total_cdrs"] > 1800
@@ -262,19 +239,19 @@ def test_api_dashboard_metrics(auth_headers):
     assert d1["locations_tracked"] >= 10
 
     # Without case_id
-    r2 = requests.get(f"{BASE_URL}/api/dashboard/metrics", headers=auth_headers)
+    r2 = client.get("/api/dashboard/metrics", headers=auth_headers)
     assert r2.status_code == 200
     d2 = r2.json()
     assert d2["total_cases"] >= 1
 
     # Invalid case_id -> 404
-    r3 = requests.get(f"{BASE_URL}/api/dashboard/metrics?case_id=NON-EXISTENT", headers=auth_headers)
+    r3 = client.get("/api/dashboard/metrics?case_id=NON-EXISTENT", headers=auth_headers)
     assert r3.status_code == 404
 
 
-def test_api_raw_cdr(auth_headers):
+def test_api_raw_cdr(client, auth_headers):
     case_id = "CASE-RAJ-2026-0042"
-    r = requests.get(f"{BASE_URL}/api/cases/{case_id}/raw-cdr?page=1&limit=20&search=9829022222", headers=auth_headers)
+    r = client.get(f"/api/cases/{case_id}/raw-cdr?page=1&limit=20&search=9829022222", headers=auth_headers)
     assert r.status_code == 200
     data = r.json()
     assert data["total"] > 0
@@ -283,9 +260,9 @@ def test_api_raw_cdr(auth_headers):
     assert "source_row" in data["records"][0]
 
 
-def test_api_mfc(auth_headers):
+def test_api_mfc(client, auth_headers):
     case_id = "CASE-RAJ-2026-0042"
-    r = requests.get(f"{BASE_URL}/api/cases/{case_id}/mfc?target_number=9829022222&top=15", headers=auth_headers)
+    r = client.get(f"/api/cases/{case_id}/mfc?target_number=9829022222&top=15", headers=auth_headers)
     assert r.status_code == 200
     data = r.json()
     assert len(data) > 0
@@ -293,9 +270,9 @@ def test_api_mfc(auth_headers):
     assert "call_count" in data[0]
 
 
-def test_api_day_night(auth_headers):
+def test_api_day_night(client, auth_headers):
     case_id = "CASE-RAJ-2026-0042"
-    r = requests.get(f"{BASE_URL}/api/cases/{case_id}/day-night?target_number=9829055555", headers=auth_headers)
+    r = client.get(f"/api/cases/{case_id}/day-night?target_number=9829055555", headers=auth_headers)
     assert r.status_code == 200
     data = r.json()
     assert "summary" in data
@@ -303,9 +280,9 @@ def test_api_day_night(auth_headers):
     assert len(data["night_locations"]) > 0
 
 
-def test_api_first_last(auth_headers):
+def test_api_first_last(client, auth_headers):
     case_id = "CASE-RAJ-2026-0042"
-    r = requests.get(f"{BASE_URL}/api/cases/{case_id}/first-last?target_number=9829022222", headers=auth_headers)
+    r = client.get(f"/api/cases/{case_id}/first-last?target_number=9829022222", headers=auth_headers)
     assert r.status_code == 200
     data = r.json()
     assert len(data) > 0
@@ -313,18 +290,18 @@ def test_api_first_last(auth_headers):
     assert "last_call_time" in data[0]
 
 
-def test_api_missing_dates(auth_headers):
+def test_api_missing_dates(client, auth_headers):
     case_id = "CASE-RAJ-2026-0042"
-    r = requests.get(f"{BASE_URL}/api/cases/{case_id}/missing-dates?target_number=9829044444", headers=auth_headers)
+    r = client.get(f"/api/cases/{case_id}/missing-dates?target_number=9829044444", headers=auth_headers)
     assert r.status_code == 200
     data = r.json()
     assert "missing_dates" in data
     assert "silence_periods" in data
 
 
-def test_api_movement(auth_headers):
+def test_api_movement(client, auth_headers):
     case_id = "CASE-RAJ-2026-0042"
-    r = requests.get(f"{BASE_URL}/api/cases/{case_id}/movement?target_number=9829022222", headers=auth_headers)
+    r = client.get(f"/api/cases/{case_id}/movement?target_number=9829022222", headers=auth_headers)
     assert r.status_code == 200
     data = r.json()
     assert len(data) > 0
@@ -333,63 +310,66 @@ def test_api_movement(auth_headers):
     assert "distance_km" in data[0]
 
 
-def test_api_service_numbers(auth_headers):
+def test_api_service_numbers(client, auth_headers):
     case_id = "CASE-RAJ-2026-0042"
-    r = requests.get(f"{BASE_URL}/api/cases/{case_id}/service-numbers", headers=auth_headers)
+    r = client.get(f"/api/cases/{case_id}/service-numbers", headers=auth_headers)
     assert r.status_code == 200
     data = r.json()
     assert len(data) >= 3
     assert "service_name" in data[0]
 
 
-def test_api_international(auth_headers):
+def test_api_international(client, auth_headers):
     case_id = "CASE-RAJ-2026-0042"
-    r = requests.get(f"{BASE_URL}/api/cases/{case_id}/international", headers=auth_headers)
+    r = client.get(f"/api/cases/{case_id}/international", headers=auth_headers)
     assert r.status_code == 200
     data = r.json()
     assert len(data) >= 2
     assert "country" in data[0]
 
 
-def test_api_imei_and_imsi_summary(auth_headers):
+def test_api_imei_and_imsi_summary(client, auth_headers):
     case_id = "CASE-RAJ-2026-0042"
-    r_imei = requests.get(f"{BASE_URL}/api/cases/{case_id}/imei-summary", headers=auth_headers)
+    r_imei = client.get(f"/api/cases/{case_id}/imei-summary", headers=auth_headers)
     assert r_imei.status_code == 200
     data_imei = r_imei.json()
     assert len(data_imei) >= 5
     assert "brand" in data_imei[0]
 
-    r_imsi = requests.get(f"{BASE_URL}/api/cases/{case_id}/imsi-summary", headers=auth_headers)
+    r_imsi = client.get(f"/api/cases/{case_id}/imsi-summary", headers=auth_headers)
     assert r_imsi.status_code == 200
     data_imsi = r_imsi.json()
     assert len(data_imsi) >= 5
     assert "carrier" in data_imsi[0]
 
 
-def test_api_tac_lookup(auth_headers):
-    r = requests.get(f"{BASE_URL}/api/tac/354890123456781", headers=auth_headers)
+def test_api_tac_lookup(client, auth_headers):
+    r = client.get("/api/tac/354890123456781", headers=auth_headers)
     assert r.status_code == 200
     data = r.json()
     assert data["brand"] == "Apple"
     assert "iPhone 15" in data["model"]
 
 
-def test_api_global_search(auth_headers):
+def test_api_global_search(client, auth_headers):
     case_id = "CASE-RAJ-2026-0042"
-    r = requests.get(f"{BASE_URL}/api/search?q=9829022222&case_id={case_id}", headers=auth_headers)
+    r = client.get(f"/api/search?q=9829022222&case_id={case_id}", headers=auth_headers)
     assert r.status_code == 200
     data = r.json()
     assert data["total_matches"] > 0
     assert len(data["results"]["numbers"]) > 0
 
 
-def test_api_unauthorized_rejection():
-    # Calling without auth token must return 401 or 403
-    r = requests.get(f"{BASE_URL}/api/cases/CASE-RAJ-2026-0042/raw-cdr")
+def test_api_unauthorized_rejection(test_db_engine):
+    from fastapi.testclient import TestClient
+    from app.main import app
+    fresh = TestClient(app)
+    # Calling without auth token or cookie must return 401 or 403
+    r = fresh.get("/api/cases/CASE-RAJ-2026-0042/raw-cdr")
     assert r.status_code in (401, 403)
 
 
-def test_analyze_link_between_numbers(db_session):
+def test_analyze_link_between_numbers(client, db_session):
     case_id = "CASE-RAJ-2026-0042"
     res = an.analyze_link_between_numbers(case_id, "9829022222", "9829033333", db_session)
     assert res["num1"] == "9829022222"
@@ -399,16 +379,16 @@ def test_analyze_link_between_numbers(db_session):
     assert "shared_towers" in res
 
 
-def test_dynamic_ordered_suspects_fallback(db_session):
+def test_dynamic_ordered_suspects_fallback(client, db_session):
     # Even for a case without brief_data, get_ordered_suspects_for_case must return dynamic targets
     suspects = an.get_ordered_suspects_for_case("CASE-RAJ-2026-0042", db_session)
     assert len(suspects) >= 4
     assert all("phone" in s and s["phone"] for s in suspects)
 
 
-def test_api_extended_analytics_and_notifications(auth_headers):
+def test_api_extended_analytics_and_notifications(client, auth_headers):
     case_id = "CASE-RAJ-2026-0042"
-    r = requests.get(f"{BASE_URL}/api/cases/{case_id}/analytics", headers=auth_headers)
+    r = client.get(f"/api/cases/{case_id}/analytics", headers=auth_headers)
     assert r.status_code == 200
     d = r.json()
     for key in [
@@ -425,9 +405,9 @@ def test_api_extended_analytics_and_notifications(auth_headers):
     assert len(d["interactive_timeline"]) > 0
 
 
-def test_api_link_analysis(auth_headers):
+def test_api_link_analysis(client, auth_headers):
     case_id = "CASE-RAJ-2026-0042"
-    r = requests.get(f"{BASE_URL}/api/cases/{case_id}/link-analysis?num1=9829022222&num2=9829033333", headers=auth_headers)
+    r = client.get(f"/api/cases/{case_id}/link-analysis?num1=9829022222&num2=9829033333", headers=auth_headers)
     assert r.status_code == 200
     data = r.json()
     assert len(data["shared_contacts"]) >= 2
@@ -445,5 +425,42 @@ def test_external_config_loading():
     res = an.lookup_tac_device("356492104581294")
     assert res["brand"] == "Apple"
     assert "mfr" in res and "origin" in res
+
+
+def test_api_inspect_and_ipdr_sample(client, auth_headers):
+    import io, pandas as pd
+
+    # 1. Inspect an arbitrary Excel CDR
+    df = pd.DataFrame([{"Caller": "9811112222", "Callee": "9822223333", "Time": "2026-11-24 10:00:00", "Dur": "30", "IMEI": "354890123456781"}])
+    buf = io.BytesIO()
+    df.to_excel(buf, index=False)
+    r_insp = client.post(
+        "/api/ingest/inspect",
+        files={"file": ("custom_test.xlsx", buf.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        headers=auth_headers
+    )
+    assert r_insp.status_code == 200
+    insp = r_insp.json()
+    assert insp["format"] == "EXCEL"
+    assert insp["suggested_mapping"]["a_number"] == "Caller"
+
+    # 2. Invalid file returns 400 cleanly
+    r_bad = client.post("/api/ingest/inspect", files={"file": ("empty.csv", b"", "text/csv")}, headers=auth_headers)
+    assert r_bad.status_code == 400
+
+    # 3. IPDR sample returns real session for seeded case and available=False for empty case
+    r_smp = client.get("/api/cases/CASE-RAJ-2026-0042/ipdr/sample", headers=auth_headers)
+    assert r_smp.status_code == 200
+    assert r_smp.json()["available"] is True
+
+    client.post("/api/cases", json={"id": "EMPTY-CASE-01", "title": "Empty Case"}, headers=auth_headers)
+    r_empty = client.get("/api/cases/EMPTY-CASE-01/ipdr/sample", headers=auth_headers)
+    assert r_empty.status_code == 200
+    assert r_empty.json()["available"] is False
+
+    # 4. /api/cases/demo is gone
+    r_demo = client.post("/api/cases/demo", headers=auth_headers)
+    assert r_demo.status_code in (404, 405)
+
 
 

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
 from langgraph.graph import StateGraph, END
-from app.db import CDRRecord, Case, AIObservation
+from app.db import CDRRecord, IPDRRecord, Case, AIObservation
 from app.analysis import (
     analyze_communication_patterns,
     find_common_numbers,
@@ -81,9 +81,9 @@ def detect_intent_rule_based(query: str, suspect_numbers: list[str]) -> tuple[st
     # 2. IPDR Lookup
     if ip or "ipdr" in q or "ip address" in q or "public ip" in q:
         return "ipdr_lookup", "match_ipdr_session", {
-            "ip": ip or "103.211.54.12",
-            "port": port or 44321,
-            "timestamp": "2026-11-20T18:25:10"
+            "ip": ip or "",
+            "port": port or 0,
+            "timestamp": ""
         }
 
     # 3. Meeting detection / same tower same time
@@ -142,6 +142,23 @@ def intent_node(state: AgentState, db: Session) -> AgentState:
     llm_key = os.getenv("LLM_API_KEY")
     # If no LLM key or swappable fallback requested:
     intent, tool_name, tool_args = detect_intent_rule_based(query, suspect_set)
+
+    # Dynamically resolve missing IPDR args from active case's uploaded IPDR records
+    if intent == "ipdr_lookup" and not tool_args.get("ip"):
+        sample = db.query(IPDRRecord).filter(IPDRRecord.case_id == case_id).first()
+        if sample:
+            tool_args["ip"] = sample.source_ip
+            tool_args["port"] = sample.source_port
+            tool_args["timestamp"] = sample.session_start
+    elif intent == "ipdr_lookup" and not tool_args.get("timestamp"):
+        sample = db.query(IPDRRecord).filter(
+            IPDRRecord.case_id == case_id,
+            IPDRRecord.source_ip == tool_args["ip"]
+        ).first()
+        if sample:
+            tool_args["timestamp"] = sample.session_start
+            if not tool_args.get("port"):
+                tool_args["port"] = sample.source_port
 
     state["intent"] = intent
     state["tool_name"] = tool_name
