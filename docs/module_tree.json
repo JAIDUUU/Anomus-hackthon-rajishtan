@@ -1,0 +1,114 @@
+{
+  "Overview": {
+    "description": "System architecture, core data flow, and Rajasthan Police Hackathon 2026 solution overview",
+    "components": [
+      "app/main.py::app",
+      "app/db.py::Base",
+      "app/db.py::Case"
+    ],
+    "children": {}
+  },
+  "Ingestion_Engine": {
+    "description": "Heterogeneous CDR & IPDR normalization, dynamic mapping configs, phone/timestamp sanitization, and chain-of-custody tracking",
+    "components": [
+      "app/ingest.py::normalize_phone_number",
+      "app/ingest.py::parse_duration_to_sec",
+      "app/ingest.py::parse_datetime_flexible",
+      "app/ingest.py::ingest_cdr_data",
+      "app/ingest.py::ingest_ipdr_data",
+      "app/ingest.py::get_available_mappings",
+      "app/ingest.py::save_mapping_config"
+    ],
+    "children": {}
+  },
+  "Forensic_Analytics": {
+    "description": "Comprehensive telecom analytics: MFC, cross-suspect correlation matrix, IMEI/SIM swaps, TAC handset intelligence, nocturnal ratios, and dormancy detection",
+    "components": [
+      "app/analysis.py::analyze_communication_patterns",
+      "app/analysis.py::find_common_numbers",
+      "app/analysis.py::detect_imei_sim_changes",
+      "app/analysis.py::lookup_tac_device",
+      "app/analysis.py::get_mfc_analysis",
+      "app/analysis.py::get_day_night_analysis",
+      "app/analysis.py::get_first_last_calls",
+      "app/analysis.py::get_missing_dates_analysis",
+      "app/analysis.py::get_service_and_company_numbers",
+      "app/analysis.py::get_international_intelligence",
+      "app/analysis.py::global_search"
+    ],
+    "children": {}
+  },
+  "Geospatial_Tracking": {
+    "description": "Cell tower movement trajectory, azimuth sector tracking, and spatial-temporal co-location/meeting detection algorithms",
+    "components": [
+      "app/analysis.py::get_location_timeline",
+      "app/analysis.py::detect_meetings",
+      "app/analysis.py::get_movement_and_cell_changes",
+      "app/ingest.py::seed_towers_from_csv",
+      "app/db.py::CellTower"
+    ],
+    "children": {}
+  },
+  "Network_Topology": {
+    "description": "Cytoscape.js network graph generation, caller-receiver edge weighting, degree centrality, and criminal syndicate core isolation",
+    "components": [
+      "app/analysis.py::get_network_graph_data",
+      "app/analysis.py::get_suspect_numbers_for_case"
+    ],
+    "children": {}
+  },
+  "IPDR_NAT_Resolver": {
+    "description": "Carrier-Grade NAT (CGNAT) resolution engine, triple-key matching (IP, port, timestamp window), and encrypted app signature detection",
+    "components": [
+      "app/ipdr.py::match_ipdr_session",
+      "app/ipdr.py::get_subscriber_ipdr_summary",
+      "app/db.py::IPDRRecord"
+    ],
+    "children": {}
+  },
+  "AI_Investigation_Assistant": {
+    "description": "LangGraph copilot with bilingual English/Hinglish NLP, Section 5(2) Indian Telegraph Act guardrails, and Section 65B forensic citations",
+    "components": [
+      "app/assistant.py::AgentState",
+      "app/assistant.py::run_ai_assistant",
+      "app/assistant.py::extract_phone_numbers",
+      "app/assistant.py::extract_ip_and_port",
+      "app/db.py::AIObservation"
+    ],
+    "children": {}
+  },
+  "Security_Audit_Chain": {
+    "description": "Multi-tier Role-Based Access Control (RBAC), tamper-evident SHA-256 hash chaining, and forensic chain-of-custody logging",
+    "components": [
+      "app/auth.py::create_access_token",
+      "app/auth.py::get_current_user",
+      "app/auth.py::require_role",
+      "app/auth.py::verify_password",
+      "app/audit.py::log_audit_event",
+      "app/audit.py::get_audit_logs",
+      "app/db.py::AuditLog",
+      "app/db.py::User"
+    ],
+    "children": {}
+  },
+  "Reporting_Engine": {
+    "description": "Statutory judicial PDF generation with official police footers, Section 65B certificates, and multi-tab Excel workbooks",
+    "components": [
+      "app/reports.py::generate_pdf_report",
+      "app/reports.py::generate_excel_report"
+    ],
+    "children": {}
+  },
+  "API_Reference": {
+    "description": "Complete FastAPI REST endpoints reference, authentication models, query parameters, and response schemas",
+    "components": [
+      "app/main.py::login",
+      "app/main.py::get_current_case_details",
+      "app/main.py::upload_case_file",
+      "app/main.py::load_demo_case",
+      "app/main.py::ask_ai_assistant",
+      "app/main.py::verify_observation"
+    ],
+    "children": {}
+  }
+}
