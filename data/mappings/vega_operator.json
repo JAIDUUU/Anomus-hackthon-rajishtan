@@ -1,0 +1,23 @@
+{
+  "name": "Vega-4n6 Forensic Format CDR",
+  "type": "CDR",
+  "description": "Vega-4n6 open forensic CDR schema with direction indicators and coordinates",
+  "mappings": {
+    "a_number": "A Number",
+    "b_number": "B Number",
+    "call_type": "INBOUND_OUTBOUND_IND",
+    "start_time": "Start Time",
+    "duration_sec": "Call_Network_Volume",
+    "imei": "IMEI",
+    "imsi": "IMSI",
+    "cell_id": "Location"
+  },
+  "date_format": "%d/%m/%Y %H:%M",
+  "duration_format": "seconds",
+  "call_type_mapping": {
+    "OUTGOING": "OUT",
+    "INCOMING": "IN",
+    "SMS": "SMS",
+    "CALL": "OUT"
+  }
+}
