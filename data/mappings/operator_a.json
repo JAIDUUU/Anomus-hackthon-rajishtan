@@ -1,0 +1,26 @@
+{
+  "name": "Operator A - DoT 22-Field Standard CDR",
+  "type": "CDR",
+  "description": "Standardized 22-field Indian Law Enforcement Agency CDR format (DoT / CMS compliance)",
+  "mappings": {
+    "a_number": "Target_A_Party_Number",
+    "b_number": "B_Party_Number",
+    "call_type": "Call_Type",
+    "start_time": ["Call_Date", "Call_Initiation_Time"],
+    "duration_sec": "Call_Duration_Sec",
+    "imei": "IMEI",
+    "imsi": "IMSI",
+    "cell_id": "First_Cell_Global_ID"
+  },
+  "date_format": "%d-%m-%Y %H:%M:%S",
+  "duration_format": "seconds",
+  "call_type_mapping": {
+    "IN": "IN",
+    "OUT": "OUT",
+    "SMS_IN": "SMS",
+    "SMS_OUT": "SMS",
+    "INCOMING": "IN",
+    "OUTGOING": "OUT",
+    "SMS": "SMS"
+  }
+}
