@@ -1,0 +1,17 @@
+{
+  "name": "Operator A - DoT Carrier NAT 22-Field IPDR",
+  "type": "IPDR",
+  "description": "Standardized 22-field Indian Law Enforcement CGNAT IPDR session log (DoT standard)",
+  "mappings": {
+    "subscriber_number": "subscriber_msisdn",
+    "source_ip": "public_nat_ip",
+    "source_port": "public_nat_port",
+    "destination_ip": "destination_ip",
+    "destination_port": "destination_port",
+    "session_start": "session_start_timestamp",
+    "session_end": "session_end_timestamp",
+    "bytes_transferred": "total_bytes_transferred",
+    "app_hint": "app_protocol_hint"
+  },
+  "date_format": "%Y-%m-%d %H:%M:%S"
+}
