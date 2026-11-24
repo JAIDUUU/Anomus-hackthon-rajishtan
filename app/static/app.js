@@ -1,5 +1,5 @@
 // ==============================================================================
-// RAJASTHAN POLICE CYBER CRIME CELL - COMMAND CENTER v5.2.0 CORE JS
+// RAJASTHAN POLICE CYBER CRIME CELL - COMMAND CENTER CORE JS
 // ==============================================================================
 
 let currentToken = localStorage.getItem("token") || "";
