@@ -18,7 +18,7 @@ from app.auth import (
     hash_password, verify_password, create_access_token,
     get_current_user, require_role, seed_default_users
 )
-from app.audit import log_audit_event, get_audit_logs
+from app.audit import log_audit_event, get_audit_logs, verify_audit_integrity
 from app.ingest import (
     get_available_mappings, save_mapping_config,
     ingest_cdr_data, ingest_ipdr_data, seed_towers_from_csv,
@@ -1549,9 +1549,22 @@ def view_audit_logs(
             "action": l.action,
             "details": json.loads(l.details) if l.details else {},
             "ip_address": l.ip_address,
-            "timestamp": l.timestamp.isoformat() if l.timestamp else None
+            "timestamp": l.timestamp.isoformat() if l.timestamp else None,
+            "prev_hash": l.prev_hash,
+            "entry_hash": l.entry_hash
         })
     return results
+
+
+@app.get("/api/audit/verify")
+def verify_audit_chain(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin", "senior_officer", "investigating_officer"))
+):
+    """
+    Cryptographic SHA-256 Hash Chain verification for Section 65B Indian Evidence Act integrity.
+    """
+    return verify_audit_integrity(db)
 
 
 @app.get("/favicon.ico")

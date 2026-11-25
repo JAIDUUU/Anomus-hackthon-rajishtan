@@ -144,6 +144,8 @@ class AuditLog(Base):
     details = Column(Text, default="{}")
     ip_address = Column(String(50), default="")
     timestamp = Column(DateTime, default=datetime.utcnow)
+    prev_hash = Column(String(64), default="")
+    entry_hash = Column(String(64), default="")
 
 
 def get_db():

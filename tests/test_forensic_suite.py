@@ -587,6 +587,45 @@ def test_tac_full_cache_and_batch_ipdr(client, auth_headers, db_session):
     assert q2["matched"] is False
 
 
+def test_audit_hash_chain_verification(client, auth_headers, db_session):
+    from app.audit import verify_audit_integrity, log_audit_event
+    from app.db import AuditLog
+
+    # 1. Log a few fresh events
+    log_audit_event(db_session, action="TEST_EVENT_1", details={"step": 1}, username="test_officer")
+    log_audit_event(db_session, action="TEST_EVENT_2", details={"step": 2}, username="test_officer")
+
+    # 2. Check API endpoint GET /api/audit/verify
+    r = client.get("/api/audit/verify", headers=auth_headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["is_valid"] is True
+    assert data["total_records"] >= 2
+    assert len(data["latest_hash"]) == 64
+    assert data["verification_status"] == "AUTHENTIC"
+
+    # 3. Simulate tamper detection: tamper with the latest record directly in DB
+    last_rec = db_session.query(AuditLog).order_by(AuditLog.id.desc()).first()
+    original_details = last_rec.details
+    try:
+        last_rec.details = '{"step": 999, "tampered": true}'
+        db_session.commit()
+
+        tampered_result = verify_audit_integrity(db_session)
+        assert tampered_result["is_valid"] is False
+        assert len(tampered_result["tampered_records"]) >= 1
+        assert tampered_result["verification_status"] == "INTEGRITY_BREACH_DETECTED"
+    finally:
+        # Restore original details
+        last_rec.details = original_details
+        db_session.commit()
+
+    # Integrity restored
+    restored = verify_audit_integrity(db_session)
+    assert restored["is_valid"] is True
+
+
+
 
 
 
