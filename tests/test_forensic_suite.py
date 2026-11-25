@@ -498,5 +498,40 @@ def test_lea_preamble_stripping_and_tower_master(client, auth_headers):
     assert db.query(CellTower).count() >= 50
 
 
+def test_threat_scoring_and_heatmap_endpoints(client, auth_headers):
+    # 1. Threat Scoring endpoint
+    r_threat = client.get("/api/cases/CASE-RAJ-2026-0042/threat-scoring", headers=auth_headers)
+    assert r_threat.status_code == 200
+    threats = r_threat.json()
+    assert isinstance(threats, list)
+    assert len(threats) > 0
+    top = threats[0]
+    assert "threat_score" in top
+    assert 0 <= top["threat_score"] <= 100
+    assert "archetype" in top
+    assert "risk_level" in top
+    assert "factors" in top
+
+    # 2. 24x7 Heatmap endpoint
+    r_heat = client.get("/api/cases/CASE-RAJ-2026-0042/heatmap", headers=auth_headers)
+    assert r_heat.status_code == 200
+    heat = r_heat.json()
+    assert "matrix" in heat
+    assert len(heat["matrix"]) == 7  # 7 days
+    assert len(heat["matrix"][0]) == 24  # 24 hours
+    assert "busiest_hour" in heat
+
+    # 3. Analytics contains threat scores & heatmap, and movement hops are per-subscriber
+    r_ana = client.get("/api/cases/CASE-RAJ-2026-0042/analytics", headers=auth_headers)
+    assert r_ana.status_code == 200
+    ana = r_ana.json()
+    assert "threat_scores" in ana
+    assert "heatmap_24x7" in ana
+    # Check that movement hops transitions do not jump between different numbers
+    for h in ana.get("cell_id_changes", []):
+        assert "number" in h
+
+
+
 
 

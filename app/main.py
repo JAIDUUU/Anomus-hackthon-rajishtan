@@ -33,7 +33,8 @@ from app.analysis import (
     get_mfc_analysis, get_day_night_analysis, get_first_last_calls,
     get_missing_dates_analysis, get_movement_and_cell_changes,
     get_service_and_company_numbers, get_international_intelligence,
-    get_imei_summary_list, get_imsi_summary_list, global_search
+    get_imei_summary_list, get_imsi_summary_list, global_search,
+    calculate_suspect_threat_scores, get_temporal_heatmap_24x7
 )
 from app.ipdr import match_ipdr_session, get_subscriber_ipdr_summary
 from app.assistant import run_ai_assistant
@@ -934,6 +935,25 @@ def get_link_analysis_endpoint(
     return analyze_link_between_numbers(case_id, num1.strip(), num2.strip(), db)
 
 
+@app.get("/api/cases/{case_id}/threat-scoring")
+def get_case_threat_scoring(
+    case_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("investigating_officer", "senior_officer", "admin"))
+):
+    return calculate_suspect_threat_scores(case_id, db)
+
+
+@app.get("/api/cases/{case_id}/heatmap")
+def get_case_temporal_heatmap(
+    case_id: str,
+    target_number: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("investigating_officer", "senior_officer", "admin"))
+):
+    return get_temporal_heatmap_24x7(case_id, db, target_number)
+
+
 @app.get("/api/cases/{case_id}/analytics")
 def get_case_analytics(
     case_id: str,
@@ -948,6 +968,8 @@ def get_case_analytics(
     if not records:
         return {
             "suspects": suspects_list,
+            "threat_scores": [],
+            "heatmap_24x7": {},
             "mfc": [], "first_last": [], "day_night": {"day_calls": 0, "night_calls": 0, "day_pct": 0, "night_pct": 0, "night_numbers": []},
             "day_locations": [], "night_locations": [], "missing_dates": [], "movement": [],
             "service_numbers": [], "international_numbers": [], "imei_summary": [], "imsi_summary": [],
@@ -976,9 +998,9 @@ def get_case_analytics(
     movement_hops = []
     cell_id_changes = []
     location_changes = []
-    last_tower = None
-    last_area = None
-    last_time = None
+    last_tower_by_sub = {}
+    last_area_by_sub = {}
+    last_time_by_sub = {}
     timeline_events = []
 
     for r in records:
@@ -1102,18 +1124,22 @@ def get_case_analytics(
             if not iss["last_seen"] or st > iss["last_seen"]:
                 iss["last_seen"] = st
 
-        # Tower movement hop & Cell ID / Location changes
-        if cell and cell != last_tower:
+        # Tower movement hop & Cell ID / Location changes (tracked per subscriber)
+        prev_cell = last_tower_by_sub.get(a)
+        prev_area = last_area_by_sub.get(a)
+        prev_dt = last_time_by_sub.get(a)
+
+        if cell and cell != prev_cell:
             delta_sec = 0
-            if dt and last_time:
-                delta_sec = int((dt - last_time).total_seconds())
+            if dt and prev_dt:
+                delta_sec = max(0, int((dt - prev_dt).total_seconds()))
             t_obj = towers.get(cell)
             hop = {
                 "seq": len(movement_hops) + 1,
                 "timestamp": st,
-                "from_cell": last_tower or "-",
+                "from_cell": prev_cell or "-",
                 "cell_id": cell,
-                "from_area": last_area or "-",
+                "from_area": prev_area or "-",
                 "area_name": area_name,
                 "lat": t_obj.lat if t_obj else None,
                 "lon": t_obj.lon if t_obj else None,
@@ -1121,13 +1147,13 @@ def get_case_analytics(
                 "time_delta_sec": delta_sec
             }
             movement_hops.append(hop)
-            if last_tower and len(cell_id_changes) < 100:
+            if prev_cell and len(cell_id_changes) < 100:
                 cell_id_changes.append(hop)
-            if last_area and area_name != last_area and len(location_changes) < 100:
+            if prev_area and area_name != prev_area and len(location_changes) < 100:
                 location_changes.append(hop)
-            last_tower = cell
-            last_area = area_name
-            last_time = dt
+            last_tower_by_sub[a] = cell
+            last_area_by_sub[a] = area_name
+            last_time_by_sub[a] = dt
 
     total_all_calls = len(records)
     # 1. MFC
@@ -1366,8 +1392,13 @@ def get_case_analytics(
             "meta": latest_batch.mapping_name or "Normalized"
         })
 
+    threat_scores = calculate_suspect_threat_scores(case_id, db)
+    heatmap_24x7 = get_temporal_heatmap_24x7(case_id, db)
+
     return {
         "suspects": suspects_list,
+        "threat_scores": threat_scores,
+        "heatmap_24x7": heatmap_24x7,
         "mfc": mfc_list,
         "first_last": first_last_list,
         "day_night": {

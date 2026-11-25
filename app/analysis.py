@@ -2071,3 +2071,205 @@ def analyze_link_between_numbers(case_id: str, num1: str, num2: str, db: Session
         "shared_imeis": shared_imeis,
         "link_strength": "DIRECT" if direct_calls else ("BRIDGE_CONNECTED" if shared_contacts else "NONE")
     }
+
+
+# ----------------- THREAT RISK SCORING & 24x7 TEMPORAL HEATMAP -----------------
+def calculate_suspect_threat_scores(case_id: str, db: Session) -> list[dict]:
+    """
+    Computes an objective, multi-factor Threat Risk Score (0-100) and Archetype Classifier
+    for all suspects in the active case:
+    - Nocturnal Call Ratio (>25% night activity -> up to 25 pts)
+    - SIM Swapping & Device Hopping (multi-SIM IMEI or multi-IMEI number -> up to 30 pts)
+    - Impossible/High-Speed Travel (>150 km/h -> up to 20 pts)
+    - International / High-Risk Contacts (+15 pts)
+    - Cross-Suspect Common Syndicate Bridges (+10 pts)
+    """
+    suspects = get_ordered_suspects_for_case(case_id, db)
+    if not suspects:
+        return []
+
+    imei_sim_data = detect_imei_sim_changes(case_id, db)
+    swapped_imei_map = {item["imei"]: item for item in imei_sim_data.get("multi_number_imeis", [])}
+    swapped_num_map = {item["number"]: item for item in imei_sim_data.get("multi_imei_numbers", [])}
+
+    suspect_phones = [s["phone"] for s in suspects if s.get("phone")]
+    common_data = find_common_numbers(suspect_phones, case_id, db) if len(suspect_phones) >= 2 else {"common_contacts": []}
+    shared_bridge_numbers = {c["common_number"] for c in common_data.get("common_contacts", [])}
+
+    scored_suspects = []
+
+    for s in suspects:
+        phone = s.get("phone", "")
+        new_phone = s.get("new_phone", "")
+        phones_to_check = [p for p in (phone, new_phone) if p]
+
+        records = db.query(CDRRecord).filter(
+            CDRRecord.case_id == case_id,
+            or_(CDRRecord.a_number.in_(phones_to_check), CDRRecord.b_number.in_(phones_to_check))
+        ).all()
+
+        total_calls = len(records)
+        night_calls = 0
+        intl_calls = 0
+        peers = set()
+        imeis_used = set()
+
+        for r in records:
+            if r.imei:
+                imeis_used.add(r.imei)
+            hour = 12
+            try:
+                hour = datetime.fromisoformat(r.start_time).hour
+            except Exception:
+                pass
+            if hour >= 22 or hour < 6:
+                night_calls += 1
+
+            peer = r.b_number if r.a_number in phones_to_check else r.a_number
+            if peer:
+                peers.add(peer)
+                is_intl, _, _, risk = is_international_number(peer)
+                if is_intl:
+                    intl_calls += 1
+
+        night_pct = round((night_calls / max(1, total_calls)) * 100, 1)
+
+        transitions = get_movement_and_cell_changes(case_id, db, target_number=phone)
+        impossible_hops = [t for t in transitions if t.get("is_suspicious_speed")]
+
+        score = 10
+        factors = []
+
+        if night_pct >= 40:
+            score += 25
+            factors.append(f"Excessive nocturnal communications ({night_pct}% night calls)")
+        elif night_pct >= 25:
+            score += 15
+            factors.append(f"Elevated nocturnal activity ({night_pct}% night calls)")
+
+        has_sim_swap = False
+        for im in imeis_used:
+            if im in swapped_imei_map:
+                has_sim_swap = True
+                factors.append(f"Hardware IMEI {im} rotated across {swapped_imei_map[im]['distinct_numbers_count']} SIMs")
+                break
+        for ph in phones_to_check:
+            if ph in swapped_num_map:
+                has_sim_swap = True
+                factors.append(f"Phone {ph} hopped across {swapped_num_map[ph]['distinct_imeis_count']} handsets")
+                break
+        if has_sim_swap:
+            score += 30
+
+        if impossible_hops:
+            score += 20
+            max_spd = max(h["speed_kmh"] for h in impossible_hops)
+            factors.append(f"Impossible terrestrial velocity detected ({max_spd} km/h) - cloned SIM indicator")
+
+        if intl_calls > 0:
+            score += 15
+            factors.append(f"Direct foreign international communications ({intl_calls} calls)")
+
+        linked_bridges = peers & shared_bridge_numbers
+        if len(linked_bridges) >= 2:
+            score += 10
+            factors.append(f"Directly connects to {len(linked_bridges)} shared syndicate courier nodes")
+
+        final_score = max(5, min(100, score))
+
+        if final_score >= 70:
+            risk_level = "CRITICAL"
+        elif final_score >= 45:
+            risk_level = "HIGH"
+        elif final_score >= 25:
+            risk_level = "MEDIUM"
+        else:
+            risk_level = "LOW"
+
+        if "Kingpin" in s.get("name", "") or "Kingpin" in s.get("role", "") or (len(linked_bridges) >= 2 and total_calls >= 25):
+            archetype = "Kingpin / Syndicate Head"
+        elif night_pct >= 40:
+            archetype = "Night Phisher / Bulk Scammer"
+        elif has_sim_swap:
+            archetype = "Burner SIM / Hardware Rotator"
+        elif "Mule" in s.get("name", "") or "Mule" in s.get("role", ""):
+            archetype = "Mule Cashout Operative"
+        elif impossible_hops:
+            archetype = "Cloned SIM / Dual Roamer"
+        else:
+            archetype = "Active Syndicate Operative"
+
+        if not factors:
+            factors.append("Standard telecommunications transaction baseline.")
+
+        scored_suspects.append({
+            "id": s.get("id", f"T{len(scored_suspects)+1}"),
+            "name": s.get("name", f"Target {phone}"),
+            "phone": phone,
+            "new_phone": new_phone,
+            "role": s.get("role", "Target"),
+            "handset": s.get("handset", "Smartphone"),
+            "imei": s.get("imei", ""),
+            "threat_score": final_score,
+            "risk_level": risk_level,
+            "archetype": archetype,
+            "total_calls": total_calls,
+            "night_percentage": night_pct,
+            "factors": factors,
+            "notes": s.get("notes", "")
+        })
+
+    scored_suspects.sort(key=lambda x: x["threat_score"], reverse=True)
+    return scored_suspects
+
+
+def get_temporal_heatmap_24x7(case_id: str, db: Session, target_number: str | None = None) -> dict:
+    """
+    Builds a 7-day (Monday to Sunday) x 24-hour (0 to 23) activity matrix
+    of call frequency.
+    """
+    q = db.query(CDRRecord).filter(CDRRecord.case_id == case_id)
+    if target_number:
+        clean_num = target_number.strip().replace("+91", "").lstrip("0")
+        q = q.filter(or_(CDRRecord.a_number == clean_num, CDRRecord.b_number == clean_num))
+
+    records = q.all()
+    days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    hours = list(range(24))
+
+    matrix = [[0 for _ in range(24)] for _ in range(7)]
+    hour_totals = defaultdict(int)
+    day_totals = defaultdict(int)
+    max_val = 0
+
+    for r in records:
+        if not r.start_time:
+            continue
+        try:
+            dt = datetime.fromisoformat(r.start_time)
+            day_idx = dt.weekday()
+            h = dt.hour
+            matrix[day_idx][h] += 1
+            hour_totals[h] += 1
+            day_totals[day_idx] += 1
+            if matrix[day_idx][h] > max_val:
+                max_val = matrix[day_idx][h]
+        except Exception:
+            continue
+
+    busiest_hour = max(hour_totals.items(), key=lambda x: x[1])[0] if hour_totals else 12
+    busiest_day_idx = max(day_totals.items(), key=lambda x: x[1])[0] if day_totals else 0
+    busiest_day = days[busiest_day_idx]
+
+    return {
+        "case_id": case_id,
+        "target_number": target_number,
+        "days": days,
+        "hours": hours,
+        "matrix": matrix,
+        "max_count": max_val,
+        "total_events": len(records),
+        "busiest_hour": busiest_hour,
+        "busiest_day": busiest_day
+    }
+
