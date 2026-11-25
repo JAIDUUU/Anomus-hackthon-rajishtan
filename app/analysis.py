@@ -120,6 +120,67 @@ def is_international_number(number: str | None) -> tuple[bool, str, str, str]:
 
 
 # ----------------- TAC LOOKUP -----------------
+_TAC_FULL_CACHE: dict[str, tuple[str, str]] = {}
+_TAC_FULL_LOADED = False
+
+
+def _get_tac_full(tac: str) -> tuple[str, str] | None:
+    global _TAC_FULL_CACHE, _TAC_FULL_LOADED
+    if not _TAC_FULL_LOADED:
+        _TAC_FULL_LOADED = True
+        tac_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "real_samples", "tac_full.csv")
+        if os.path.exists(tac_path):
+            try:
+                import csv
+                with open(tac_path, mode="r", encoding="utf-8", errors="ignore") as f:
+                    reader = csv.reader(f)
+                    header = next(reader, None)
+                    for row in reader:
+                        if len(row) >= 3:
+                            brand = row[0].strip()
+                            t_val = row[1].strip()
+                            specs = row[2].strip()
+                            if t_val and t_val not in _TAC_FULL_CACHE:
+                                _TAC_FULL_CACHE[t_val] = (brand, specs)
+            except Exception:
+                pass
+    return _TAC_FULL_CACHE.get(tac)
+
+
+_MCC_MNC_CACHE: dict[tuple[str, str], dict[str, str]] = {}
+_MCC_MNC_LOADED = False
+
+
+def _get_mcc_mnc_info(mcc: str, mnc: str) -> dict[str, str] | None:
+    global _MCC_MNC_CACHE, _MCC_MNC_LOADED
+    if not _MCC_MNC_LOADED:
+        _MCC_MNC_LOADED = True
+        csv_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "real_samples", "mcc_mnc_india.csv")
+        if os.path.exists(csv_path):
+            try:
+                import csv
+                with open(csv_path, mode="r", encoding="utf-8", errors="ignore") as f:
+                    reader = csv.reader(f)
+                    header = next(reader, None)
+                    for row in reader:
+                        if len(row) >= 4:
+                            r_mcc = row[0].strip()
+                            r_mnc = row[1].strip()
+                            op = row[2].strip()
+                            circle = row[3].strip()
+                            info = {"operator": op, "circle": circle}
+                            _MCC_MNC_CACHE[(r_mcc, r_mnc)] = info
+                            _MCC_MNC_CACHE[(r_mcc, r_mnc.zfill(2))] = info
+                            _MCC_MNC_CACHE[(r_mcc, r_mnc.zfill(3))] = info
+                            try:
+                                _MCC_MNC_CACHE[(r_mcc, str(int(r_mnc)))] = info
+                            except ValueError:
+                                pass
+            except Exception:
+                pass
+    return _MCC_MNC_CACHE.get((mcc, mnc))
+
+
 def lookup_tac_device(imei: str) -> dict:
     """
     Decodes an 8-digit TAC into brand, model, generation, and device details.
@@ -198,6 +259,25 @@ def lookup_tac_device(imei: str) -> dict:
             "device_type": data.get("device_type", "Smartphone"),
             "manufacturer": data["manufacturer"],
             "mfr": data["manufacturer"],
+            "origin": origin,
+            "luhn_valid": valid_luhn,
+            "valid_length": len(digits) in (14, 15, 16)
+        }
+
+    tac_full_match = _get_tac_full(tac)
+    if tac_full_match:
+        b, specs = tac_full_match
+        origin = origin_map.get(b, "Global / GSMA Member State")
+        return {
+            "imei": imei,
+            "tac": tac,
+            "brand": b,
+            "model": specs,
+            "marketing_name": f"{b} {specs}",
+            "generation": "4G LTE / 5G",
+            "device_type": "Smartphone",
+            "manufacturer": b,
+            "mfr": b,
             "origin": origin,
             "luhn_valid": valid_luhn,
             "valid_length": len(digits) in (14, 15, 16)
@@ -1172,14 +1252,27 @@ def get_imsi_summary_list(case_id: str, db: Session) -> list[dict]:
     results = []
     for imsi, st in imsi_map.items():
         carrier = "Indian Telecom Carrier"
-        if imsi.startswith("40445"):
-            carrier = "Bharti Airtel (Rajasthan)"
-        elif imsi.startswith("40585"):
-            carrier = "Reliance Jio (Rajasthan)"
-        elif imsi.startswith("40420"):
-            carrier = "Vodafone Idea (Vi)"
-        elif imsi.startswith("40400"):
-            carrier = "BSNL Rajasthan"
+        if len(imsi) >= 5:
+            mcc = imsi[:3]
+            mnc_3 = imsi[3:6] if len(imsi) >= 6 else None
+            mnc_2 = imsi[3:5]
+            mcc_match = None
+            if mnc_3:
+                mcc_match = _get_mcc_mnc_info(mcc, mnc_3)
+            if not mcc_match:
+                mcc_match = _get_mcc_mnc_info(mcc, mnc_2)
+            if mcc_match:
+                carrier = f"{mcc_match['operator']} ({mcc_match['circle']})"
+
+        if carrier == "Indian Telecom Carrier":
+            if imsi.startswith("40445"):
+                carrier = "Bharti Airtel (Rajasthan)"
+            elif imsi.startswith("40585"):
+                carrier = "Reliance Jio (Rajasthan)"
+            elif imsi.startswith("40420"):
+                carrier = "Vodafone Idea (Vi)"
+            elif imsi.startswith("40400"):
+                carrier = "BSNL Rajasthan"
 
         linked_devices = [lookup_tac_device(im) for im in sorted(list(st["linked_imeis"]))]
 

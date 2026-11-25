@@ -153,3 +153,72 @@ def get_subscriber_ipdr_summary(subscriber: str, case_id: str, db: Session) -> d
         "app_breakdown": app_breakdown,
         "sessions": sessions[:50]
     }
+
+
+def batch_match_ipdr_sessions(
+    case_id: str,
+    queries: list[dict],
+    db: Session,
+    tolerance_minutes: int = 15
+) -> dict:
+    """
+    Batch-resolve public NAT IP + Port + Timestamp tuples against carrier CGNAT IPDR sessions.
+    Essential for bulk 1930 cyber fraud complaint triage and bank transaction mapping.
+    """
+    results = []
+    matched_count = 0
+    identified_subscribers = set()
+
+    for idx, q in enumerate(queries):
+        ip = str(q.get("ip") or q.get("source_ip") or "").strip()
+        port_raw = q.get("port") or q.get("source_port") or 0
+        try:
+            port = int(port_raw)
+        except (ValueError, TypeError):
+            port = 0
+        timestamp = str(q.get("timestamp") or q.get("session_start") or "").strip()
+        ref_id = q.get("query_id") or q.get("id") or q.get("tag") or f"query_{idx+1}"
+
+        if not ip or not port or not timestamp:
+            results.append({
+                "query_id": ref_id,
+                "ip": ip,
+                "port": port,
+                "timestamp": timestamp,
+                "status": "error",
+                "matched": False,
+                "match_type": "invalid_input",
+                "explanation": "Missing required ip, port, or timestamp."
+            })
+            continue
+
+        res = match_ipdr_session(case_id, ip, port, timestamp, db, tolerance_minutes=tolerance_minutes)
+        is_matched = bool(res.get("match_found"))
+        if is_matched:
+            matched_count += 1
+            if res.get("primary_subscriber"):
+                identified_subscribers.add(res["primary_subscriber"])
+
+        results.append({
+            "query_id": ref_id,
+            "ip": ip,
+            "port": port,
+            "timestamp": timestamp,
+            "matched": is_matched,
+            "match_type": res.get("match_type", "no_match"),
+            "primary_subscriber": res.get("primary_subscriber"),
+            "session": res.get("session"),
+            "sessions": res.get("sessions", []),
+            "confidence_note": res.get("confidence_note", "")
+        })
+
+    return {
+        "case_id": case_id,
+        "total_queries": len(queries),
+        "matched_count": matched_count,
+        "unmatched_count": len(queries) - matched_count,
+        "identified_subscribers_count": len(identified_subscribers),
+        "identified_subscribers": sorted(list(identified_subscribers)),
+        "results": results
+    }
+

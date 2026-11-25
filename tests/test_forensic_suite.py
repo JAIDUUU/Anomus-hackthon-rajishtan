@@ -532,6 +532,62 @@ def test_threat_scoring_and_heatmap_endpoints(client, auth_headers):
         assert "number" in h
 
 
+def test_tac_full_cache_and_batch_ipdr(client, auth_headers, db_session):
+    # 1. TAC lookup using tac_full.csv (275k dataset)
+    # 86302407 is Xiaomi Redmi Note 14S in tac_full.csv
+    tac_dev = an.lookup_tac_device("863024071234567")
+    assert tac_dev["tac"] == "86302407"
+    assert "Xiaomi" in tac_dev["brand"] or "XIAOMI" in tac_dev["brand"]
+    assert "Redmi Note 14S" in tac_dev["model"] or "REDMI NOTE 14S" in tac_dev["model"]
+
+    # 2. MCC-MNC India circle attribution in IMSI summary
+    # Check that IMSI attribution correctly uses mcc_mnc_india.csv
+    imsis = an.get_imsi_summary_list("CASE-RAJ-2026-0042", db_session)
+    assert len(imsis) > 0
+    # Any IMSI in the list should have carrier resolved
+    for item in imsis:
+        assert item["carrier"] != ""
+        assert "mcc_mnc" in item
+
+    # 3. Batch IPDR NAT Resolver endpoint
+    # Query known session from CASE-RAJ-2026-0042 (103.211.54.12:44321 around 2026-11-20 18:25:10)
+    # plus an unmatched bogus session
+    batch_payload = {
+        "queries": [
+            {
+                "query_id": "TRANS-BANK-001",
+                "ip": "103.211.54.12",
+                "port": 44321,
+                "timestamp": "2026-11-20T18:25:10"
+            },
+            {
+                "query_id": "TRANS-BANK-002",
+                "ip": "198.51.100.99",
+                "port": 9999,
+                "timestamp": "2026-11-20T12:00:00"
+            }
+        ],
+        "tolerance_minutes": 15
+    }
+    r_batch = client.post(
+        "/api/cases/CASE-RAJ-2026-0042/ipdr/batch",
+        json=batch_payload,
+        headers=auth_headers
+    )
+    assert r_batch.status_code == 200
+    res = r_batch.json()
+    assert res["total_queries"] == 2
+    assert res["matched_count"] == 1
+    assert res["unmatched_count"] == 1
+    assert any("9829022222" in s for s in res["identified_subscribers"])
+    q1 = next(q for q in res["results"] if q["query_id"] == "TRANS-BANK-001")
+    assert q1["matched"] is True
+    assert "9829022222" in q1["primary_subscriber"]
+    q2 = next(q for q in res["results"] if q["query_id"] == "TRANS-BANK-002")
+    assert q2["matched"] is False
+
+
+
 
 
 

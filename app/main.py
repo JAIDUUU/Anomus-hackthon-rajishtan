@@ -2,7 +2,7 @@ import os
 import json
 from datetime import datetime, timedelta
 from collections import defaultdict
-from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form, Query, Request, Response
+from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form, Query, Request, Response, Body
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -36,7 +36,7 @@ from app.analysis import (
     get_imei_summary_list, get_imsi_summary_list, global_search,
     calculate_suspect_threat_scores, get_temporal_heatmap_24x7
 )
-from app.ipdr import match_ipdr_session, get_subscriber_ipdr_summary
+from app.ipdr import match_ipdr_session, get_subscriber_ipdr_summary, batch_match_ipdr_sessions
 from app.assistant import run_ai_assistant
 from app.reports import generate_pdf_report, generate_excel_report
 
@@ -481,6 +481,32 @@ def get_ipdr_sample(
         "timestamp": rec.session_start.replace("T", " "),
         "subscriber": rec.subscriber_number
     }
+
+
+@app.post("/api/cases/{case_id}/ipdr/batch")
+def batch_ipdr_lookup(
+    case_id: str,
+    payload: dict = Body(...),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("investigating_officer", "senior_officer"))
+):
+    """
+    Batch-resolve public NAT IP + Port + Timestamp tuples against carrier CGNAT IPDR sessions.
+    Used for 1930 cyber fraud bulk complainant tracing and bank transaction IP mapping.
+    """
+    queries = payload.get("queries", [])
+    if not isinstance(queries, list):
+        raise HTTPException(status_code=400, detail="Payload must include a 'queries' list")
+    tolerance = payload.get("tolerance_minutes", 15)
+    res = batch_match_ipdr_sessions(case_id, queries, db, tolerance_minutes=tolerance)
+    log_audit_event(
+        db, action="QUERY",
+        details={"type": "ipdr_batch", "query_count": len(queries), "matched_count": res.get("matched_count", 0)},
+        user=current_user, request=request
+    )
+    return res
+
 
 
 # ----------------- FEATURE 6: NETWORK GRAPH -----------------
