@@ -625,6 +625,48 @@ def test_audit_hash_chain_verification(client, auth_headers, db_session):
     assert restored["is_valid"] is True
 
 
+def test_enriched_statutory_reports(client, auth_headers):
+    import io
+    import openpyxl
+
+    case_id = "CASE-RAJ-2026-0042"
+
+    # 1. Enriched PDF report
+    r_pdf = client.get(f"/api/cases/{case_id}/report?format=pdf", headers=auth_headers)
+    assert r_pdf.status_code == 200
+    assert r_pdf.headers["content-type"] == "application/pdf"
+    assert r_pdf.content.startswith(b"%PDF")
+    assert len(r_pdf.content) > 5000
+
+    # 2. Enriched Excel report
+    r_xlsx = client.get(f"/api/cases/{case_id}/report?format=xlsx", headers=auth_headers)
+    assert r_xlsx.status_code == 200
+    assert "spreadsheetml" in r_xlsx.headers["content-type"]
+
+    wb = openpyxl.load_workbook(io.BytesIO(r_xlsx.content))
+    expected_sheets = [
+        "Case Summary",
+        "CDR Normalized Data",
+        "IPDR Sessions",
+        "AI Observations & Verification",
+        "Threat Profiling",
+        "Section 65B Audit Trail"
+    ]
+    for s in expected_sheets:
+        assert s in wb.sheetnames, f"Missing sheet: {s}"
+
+    # Verify Threat Profiling sheet content
+    ws_threat = wb["Threat Profiling"]
+    assert ws_threat.max_row >= 2
+    assert ws_threat.cell(row=1, column=4).value == "Threat_Score"
+
+    # Verify Section 65B Audit Trail sheet content
+    ws_audit = wb["Section 65B Audit Trail"]
+    assert ws_audit.max_row >= 7
+    assert "SECTION 65B" in str(ws_audit.cell(row=1, column=1).value)
+
+
+
 
 
 

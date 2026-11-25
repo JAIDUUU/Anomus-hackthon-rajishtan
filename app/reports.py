@@ -11,14 +11,16 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
-from app.db import Case, CDRRecord, IPDRRecord, ImportBatch, AIObservation
+from app.db import Case, CDRRecord, IPDRRecord, ImportBatch, AIObservation, AuditLog
 from app.analysis import (
     analyze_communication_patterns,
     find_common_numbers,
     detect_meetings,
     detect_imei_sim_changes,
-    get_ordered_suspects_for_case
+    get_ordered_suspects_for_case,
+    calculate_suspect_threat_scores
 )
+from app.audit import verify_audit_integrity
 
 
 def generate_pdf_report(case_id: str, db: Session) -> io.BytesIO:
@@ -137,8 +139,37 @@ def generate_pdf_report(case_id: str, db: Session) -> io.BytesIO:
     story.append(t_val)
     story.append(Spacer(1, 10))
 
+    # 2. Suspect Threat Risk Profiling & Archetype Classifier
+    story.append(Paragraph("2. Suspect Threat Risk Profiling & Archetype Classifier", h2_style))
+    threat_scores = calculate_suspect_threat_scores(case_id, db)
+    threat_data = [["Suspect / Target", "Threat Score", "Risk Level", "Archetype", "Primary Factors"]]
+    for ts in threat_scores[:6]:
+        factors_summary = "; ".join(ts.get("factors", [])[:2]) or "Baseline activity"
+        threat_data.append([
+            f"{ts.get('name', 'Unknown')}\n({ts.get('phone', '')})",
+            f"{ts.get('threat_score', 0)}/100",
+            ts.get("risk_level", "LOW"),
+            ts.get("archetype", "Standard Subscriber"),
+            Paragraph(factors_summary, body_style)
+        ])
+    if len(threat_data) == 1:
+        threat_data.append(["No targets profiled", "-", "-", "-", "-"])
+
+    t_threat = Table(threat_data, colWidths=[120, 75, 75, 120, 140])
+    t_threat.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#7c2d12")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#fff7ed")]),
+        ("PADDING", (0, 0), (-1, -1), 3),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE")
+    ]))
+    story.append(t_threat)
+    story.append(Spacer(1, 10))
+
     # Cross-Suspect Common Numbers
-    story.append(Paragraph("2. Cross-Suspect Common Number Correlation", h2_style))
+    story.append(Paragraph("3. Cross-Suspect Common Number Correlation", h2_style))
     common_res = find_common_numbers(suspect_nums[:3], case_id, db)
     common_list = common_res.get("common_contacts", [])
     comm_data = [["Common Number", "Connected Suspects", "Target Count", "Sample Evidence File / Row"]]
@@ -165,7 +196,7 @@ def generate_pdf_report(case_id: str, db: Session) -> io.BytesIO:
     story.append(Spacer(1, 10))
 
     # IMEI & SIM Swap Analysis
-    story.append(Paragraph("3. IMEI / SIM Swap Anomaly Detection", h2_style))
+    story.append(Paragraph("4. IMEI / SIM Swap Anomaly Detection", h2_style))
     imei_res = detect_imei_sim_changes(case_id, db)
     imei_data = [["IMEI Number", "Numbers Used", "Observation", "Date Range"]]
     for item in imei_res.get("multi_number_imeis", [])[:5]:
@@ -191,7 +222,7 @@ def generate_pdf_report(case_id: str, db: Session) -> io.BytesIO:
     story.append(Spacer(1, 10))
 
     # Physical Meeting Detection
-    story.append(Paragraph("4. Physical Co-Location / Meeting Detection", h2_style))
+    story.append(Paragraph("5. Physical Co-Location / Meeting Detection", h2_style))
     meetings = detect_meetings(suspect_nums[0], suspect_nums[1], case_id, db) if len(suspect_nums) >= 2 else []
     meet_data = [["Cell ID", "Location Name", "Time Window", "Delta (sec)", "Evidence Records"]]
     for m in meetings[:4]:
@@ -215,8 +246,35 @@ def generate_pdf_report(case_id: str, db: Session) -> io.BytesIO:
     story.append(t_meet)
     story.append(Spacer(1, 10))
 
+    # Carrier NAT (CGNAT) IPDR Traffic & Cyber Analysis
+    story.append(Paragraph("6. Carrier NAT (CGNAT) IPDR Traffic & Cyber Analysis", h2_style))
+    ipdr_sample_recs = db.query(IPDRRecord).filter(IPDRRecord.case_id == case_id).order_by(IPDRRecord.session_start.asc()).limit(6).all()
+    ipdr_table_data = [["Subscriber", "Public NAT IP:Port", "Destination IP:Port", "Session Start", "App / Protocol Hint"]]
+    for ipr in ipdr_sample_recs:
+        ipdr_table_data.append([
+            ipr.subscriber_number,
+            f"{ipr.source_ip}:{ipr.source_port}",
+            f"{ipr.destination_ip}:{ipr.destination_port}",
+            ipr.session_start[:19] if ipr.session_start else "",
+            ipr.app_hint or "Unclassified"
+        ])
+    if len(ipdr_table_data) == 1:
+        ipdr_table_data.append(["No IPDR sessions ingested for this case", "-", "-", "-", "-"])
+
+    t_ipdr = Table(ipdr_table_data, colWidths=[100, 115, 115, 100, 100])
+    t_ipdr.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e293b")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+        ("PADDING", (0, 0), (-1, -1), 3),
+    ]))
+    story.append(t_ipdr)
+    story.append(Spacer(1, 10))
+
     # AI Assistant Observations & Verification Status
-    story.append(Paragraph("5. AI Assistant Observations & Officer Verification Status", h2_style))
+    story.append(Paragraph("7. AI Assistant Observations & Officer Verification Status", h2_style))
     ai_data = [["Query", "Summary Observation", "Status", "Verified By"]]
     for obs in observations[:8]:
         status_label = obs.status.upper().replace("_", " ")
@@ -238,7 +296,39 @@ def generate_pdf_report(case_id: str, db: Session) -> io.BytesIO:
         ("PADDING", (0, 0), (-1, -1), 3),
     ]))
     story.append(t_ai)
-    story.append(Spacer(1, 25))
+    story.append(Spacer(1, 10))
+
+    # Section 65B Indian Evidence Act Cryptographic Certificate
+    story.append(Paragraph("8. Section 65B Indian Evidence Act Cryptographic Certificate", h2_style))
+    audit_integrity = verify_audit_integrity(db)
+    cert_status = audit_integrity.get("verification_status", "UNKNOWN")
+    cert_style = ParagraphStyle(
+        "CertStyle",
+        parent=styles["Normal"],
+        fontSize=8,
+        leading=11,
+        textColor=colors.HexColor("#1e293b")
+    )
+    cert_box_data = [
+        [Paragraph(f"<b>CERTIFICATE UNDER SECTION 65B(4) INDIAN EVIDENCE ACT, 1872 / SECTION 63 BSA 2023</b><br/>"
+                   f"This document certifies that the analytical outputs, telephone call records, and cyber IPDR session "
+                   f"correlations contained in this report were generated automatically by the Rajasthan Police CDR/IPDR "
+                   f"Command Center without manual data tampering. All officer queries, uploads, and automated scoring "
+                   f"are chained cryptographically in an immutable SHA-256 ledger.<br/><br/>"
+                   f"<b>Hash Chain Integrity:</b> <font color='{'#15803d' if audit_integrity.get('is_valid') else '#b91c1c'}'><b>{cert_status}</b></font><br/>"
+                   f"<b>Total Hashed Audit Events:</b> {audit_integrity.get('total_records', 0)} (Verified: {audit_integrity.get('verified_records', 0)})<br/>"
+                   f"<b>Latest Merkle-Root SHA-256 Hash:</b> {audit_integrity.get('latest_hash', 'N/A')}<br/>"
+                   f"<b>Genesis Hash:</b> {audit_integrity.get('genesis_hash', 'N/A')}<br/>"
+                   f"<b>Date/Time of Verification:</b> {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}", cert_style)]
+    ]
+    t_cert = Table(cert_box_data, colWidths=[530])
+    t_cert.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f0fdf4") if audit_integrity.get("is_valid") else colors.HexColor("#fef2f2")),
+        ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#15803d") if audit_integrity.get("is_valid") else colors.HexColor("#b91c1c")),
+        ("PADDING", (0, 0), (-1, -1), 8),
+    ]))
+    story.append(t_cert)
+    story.append(Spacer(1, 15))
 
     # Footer Disclaimer
     disclaimer = Paragraph(
@@ -349,6 +439,70 @@ def generate_excel_report(case_id: str, db: Session) -> io.BytesIO:
     for col in ws_ai.columns:
         max_len = max(len(str(cell.value or "")) for cell in col)
         ws_ai.column_dimensions[col[0].column_letter].width = min(max(max_len + 2, 12), 40)
+
+    # Sheet 5: Threat Profiling
+    ws_threat = wb.create_sheet(title="Threat Profiling")
+    threat_headers = ["Name", "Phone", "Role", "Threat_Score", "Risk_Level", "Archetype", "Total_Calls", "Night_Calls_Pct", "IMEI_Swaps", "High_Speed_Hops", "International_Calls", "Primary_Factors"]
+    ws_threat.append(threat_headers)
+    for col_idx in range(1, len(threat_headers) + 1):
+        cell = ws_threat.cell(row=1, column=col_idx)
+        cell.fill = header_fill
+        cell.font = header_font
+
+    threats = calculate_suspect_threat_scores(case_id, db)
+    for t in threats:
+        ws_threat.append([
+            t.get("name", ""),
+            t.get("phone", ""),
+            t.get("role", ""),
+            t.get("threat_score", 0),
+            t.get("risk_level", ""),
+            t.get("archetype", ""),
+            t.get("total_calls", 0),
+            t.get("night_ratio_pct", 0),
+            t.get("imei_count", 0),
+            t.get("rapid_movements_count", 0),
+            t.get("international_contacts_count", 0),
+            "; ".join(t.get("factors", []))
+        ])
+    for col in ws_threat.columns:
+        max_len = max(len(str(cell.value or "")) for cell in col)
+        ws_threat.column_dimensions[col[0].column_letter].width = min(max(max_len + 2, 10), 40)
+
+    # Sheet 6: Section 65B Audit Trail
+    ws_audit = wb.create_sheet(title="Section 65B Audit Trail")
+    audit_integrity = verify_audit_integrity(db)
+    ws_audit.append(["SECTION 65B INDIAN EVIDENCE ACT TAMPER-EVIDENT AUDIT TRAIL", ""])
+    ws_audit.append(["Integrity Status", audit_integrity.get("verification_status", "UNKNOWN")])
+    ws_audit.append(["Total Hashed Records", audit_integrity.get("total_records", 0)])
+    ws_audit.append(["Latest Chain Hash (SHA-256)", audit_integrity.get("latest_hash", "N/A")])
+    ws_audit.append(["Genesis Hash (SHA-256)", audit_integrity.get("genesis_hash", "N/A")])
+    ws_audit.append(["Verified At", datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")])
+    ws_audit.append([])  # blank row
+
+    audit_headers = ["ID", "Timestamp", "Action", "Username", "Role", "IP_Address", "Previous_Hash", "Entry_Hash"]
+    ws_audit.append(audit_headers)
+    header_row_idx = ws_audit.max_row
+    for col_idx in range(1, len(audit_headers) + 1):
+        cell = ws_audit.cell(row=header_row_idx, column=col_idx)
+        cell.fill = header_fill
+        cell.font = header_font
+
+    audit_logs = db.query(AuditLog).order_by(AuditLog.id.asc()).limit(500).all()
+    for l in audit_logs:
+        ws_audit.append([
+            l.id,
+            l.timestamp.strftime("%Y-%m-%d %H:%M:%S") if l.timestamp else "",
+            l.action,
+            l.username,
+            l.role,
+            l.ip_address,
+            l.prev_hash,
+            l.entry_hash
+        ])
+    for col in ws_audit.columns:
+        max_len = max(len(str(cell.value or "")) for cell in col)
+        ws_audit.column_dimensions[col[0].column_letter].width = min(max(max_len + 2, 10), 35)
 
     buffer = io.BytesIO()
     wb.save(buffer)
