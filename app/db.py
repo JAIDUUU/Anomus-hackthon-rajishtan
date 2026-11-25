@@ -158,3 +158,10 @@ def get_db():
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+    # Safe additive migration for existing SQLite databases missing SHA-256 hash chain columns
+    with engine.begin() as conn:
+        cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(audit_logs)").fetchall()}
+        if "prev_hash" not in cols:
+            conn.exec_driver_sql("ALTER TABLE audit_logs ADD COLUMN prev_hash VARCHAR(64) DEFAULT ''")
+        if "entry_hash" not in cols:
+            conn.exec_driver_sql("ALTER TABLE audit_logs ADD COLUMN entry_hash VARCHAR(64) DEFAULT ''")
