@@ -103,161 +103,76 @@
     <!-- LEFT SIDEBAR WITH ALL INVESTIGATION MODULES -->
     <aside class="app-sidebar">
       <div class="sidebar-header-block">
-        <div class="sidebar-header-title">INVESTIGATION</div>
-        <div class="sidebar-header-sub">Analysis modules</div>
+        <div class="sidebar-header-title">INTELLIGENCE COMMAND</div>
+        <div class="sidebar-header-sub">Unified 7-Workbench Suite</div>
       </div>
 
-      <button class="sidebar-nav-btn active" onclick="switchView('dashboard')">
-        <span class="nav-icon">🎛️</span>
-        <span>Executive Dashboard</span>
-        <span class="nav-badge">Core</span>
+      <button class="sidebar-workbench-btn active" id="wb-btn-command" onclick="switchWorkbench('command')">
+        <span class="wb-icon">🎛️</span>
+        <div class="wb-meta">
+          <span class="wb-title">Command Center</span>
+          <span class="wb-desc">Threat radar &amp; 24x7 activity</span>
+        </div>
+        <span class="wb-badge">Core</span>
       </button>
-      <button class="sidebar-nav-btn" onclick="switchView('advanced-cdr')">
-        <span class="nav-icon">📚</span>
-        <span>Advanced CDR Analysis</span>
+
+      <button class="sidebar-workbench-btn" id="wb-btn-import" onclick="switchWorkbench('import')">
+        <span class="wb-icon">📂</span>
+        <div class="wb-meta">
+          <span class="wb-title">Data Ingestion</span>
+          <span class="wb-desc">Upload, mapping &amp; batch IPDR</span>
+        </div>
+        <span class="wb-badge" id="badge-cdr-count">0</span>
       </button>
-      <button class="sidebar-nav-btn" onclick="switchView('graph')">
-        <span class="nav-icon">📊</span>
-        <span>Graph Analytics</span>
+
+      <button class="sidebar-workbench-btn" id="wb-btn-behavior" onclick="switchWorkbench('behavior')">
+        <span class="wb-icon">🌓</span>
+        <div class="wb-meta">
+          <span class="wb-title">Behavioral Forensics</span>
+          <span class="wb-desc">Day/Night, silence &amp; MFC</span>
+        </div>
       </button>
-      <button class="sidebar-nav-btn" onclick="switchView('raw-cdr')">
-        <span class="nav-icon">🗄️</span>
-        <span>Raw CDR Data</span>
-        <span class="nav-badge" id="badge-cdr-count">0</span>
+
+      <button class="sidebar-workbench-btn" id="wb-btn-geo" onclick="switchWorkbench('geo')">
+        <span class="wb-icon">🌐</span>
+        <div class="wb-meta">
+          <span class="wb-title">Geospatial Mobility</span>
+          <span class="wb-desc">Trajectory playback &amp; meetings</span>
+        </div>
       </button>
-      <button class="sidebar-nav-btn" onclick="switchView('mfc')">
-        <span class="nav-icon">👥</span>
-        <span>MFC Analysis</span>
+
+      <button class="sidebar-workbench-btn" id="wb-btn-network" onclick="switchWorkbench('network')">
+        <span class="wb-icon">📊</span>
+        <div class="wb-meta">
+          <span class="wb-title">Syndicate Network</span>
+          <span class="wb-desc">Centrality graph &amp; bridge nodes</span>
+        </div>
       </button>
-      <button class="sidebar-nav-btn" onclick="switchView('network-analysis')">
-        <span class="nav-icon">📶</span>
-        <span>Network Analysis</span>
+
+      <button class="sidebar-workbench-btn" id="wb-btn-device-cyber" onclick="switchWorkbench('device-cyber')">
+        <span class="wb-icon">📱</span>
+        <div class="wb-meta">
+          <span class="wb-title">Handset &amp; Cyber</span>
+          <span class="wb-desc">275k TAC, SIM swaps &amp; IPDR</span>
+        </div>
       </button>
-      <button class="sidebar-nav-btn" onclick="switchView('ownership')">
-        <span class="nav-icon">👤</span>
-        <span>Ownership Intelligence</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('international')">
-        <span class="nav-icon">🌍</span>
-        <span>International Intelligence</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('service-numbers')">
-        <span class="nav-icon">🏢</span>
-        <span>Service &amp; Company Numbers</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('imei-summary')">
-        <span class="nav-icon">📱</span>
-        <span>IMEI Summary</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('imsi-summary')">
-        <span class="nav-icon">💳</span>
-        <span>IMSI Summary</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('imei-patterns')">
-        <span class="nav-icon">🧬</span>
-        <span>IMEI Patterns</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('imsi-patterns')">
-        <span class="nav-icon">🪪</span>
-        <span>IMSI Patterns</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('first-last')">
-        <span class="nav-icon">📞</span>
-        <span>First / Last Call</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('location-summary')">
-        <span class="nav-icon">📍</span>
-        <span>Location Summary</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('location-intelligence')">
-        <span class="nav-icon">🧭</span>
-        <span>Location Intelligence</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('day-locations')">
-        <span class="nav-icon">☀️</span>
-        <span>Day Locations</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('day-calls')">
-        <span class="nav-icon">🌤️</span>
-        <span>Day Calls</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('night-locations')">
-        <span class="nav-icon">🌙</span>
-        <span>Night Locations</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('night-calls')">
-        <span class="nav-icon">🌑</span>
-        <span>Night Calls</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('movement')">
-        <span class="nav-icon">🔀</span>
-        <span>Movement Chart</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('cell-id-changes')">
-        <span class="nav-icon">⇄</span>
-        <span>Cell ID Changes</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('location-changes')">
-        <span class="nav-icon">🗺️</span>
-        <span>Location Changes</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('missing-dates')">
-        <span class="nav-icon">📅</span>
-        <span>Missing Dates</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('interactive-timeline')">
-        <span class="nav-icon">🕒</span>
-        <span>Interactive Timeline</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('link-analysis')">
-        <span class="nav-icon">🔗</span>
-        <span>Link Analysis</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('geo-map')">
-        <span class="nav-icon">🌐</span>
-        <span>Geo Intelligence</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('common-numbers')">
-        <span class="nav-icon">🤝</span>
-        <span>Common Numbers</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('meetings')">
-        <span class="nav-icon">🚨</span>
-        <span>Meeting Rendezvous</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('device-changes')">
-        <span class="nav-icon">🔄</span>
-        <span>SIM Swaps &amp; Hopping</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('day-night')">
-        <span class="nav-icon">🌓</span>
-        <span>Day / Night Overview</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('ipdr')">
-        <span class="nav-icon">🛰️</span>
-        <span>IPDR Analysis</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('assistant')">
-        <span class="nav-icon">🤖</span>
-        <span>AI Assistant Chat</span>
-        <span class="nav-badge" style="background:#0284c7;color:#fff;">AI</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('reports')">
-        <span class="nav-icon">📥</span>
-        <span>Reports &amp; Downloads</span>
-      </button>
-      <button class="sidebar-nav-btn" onclick="switchView('import')">
-        <span class="nav-icon">📂</span>
-        <span>Data Ingestion &amp; Mapping</span>
-      </button>
-      <button class="sidebar-nav-btn" id="audit-nav-btn" onclick="switchView('audit')">
-        <span class="nav-icon">🛡️</span>
-        <span>Section 65B Audit Log</span>
+
+      <button class="sidebar-workbench-btn" id="wb-btn-legal-audit" onclick="switchWorkbench('legal-audit')">
+        <span class="wb-icon">🛡️</span>
+        <div class="wb-meta">
+          <span class="wb-title">Legal &amp; Sec 65B Audit</span>
+          <span class="wb-desc">SHA-256 hash chain &amp; reports</span>
+        </div>
       </button>
     </aside>
 
     <!-- MAIN FORENSIC DISPLAY PANEL -->
     <main class="app-content">
+
+      <!-- DYNAMIC WORKBENCH SUB-NAVIGATION BAR -->
+      <nav id="workbench-subnav" class="workbench-subnav" aria-label="Workbench sub-views">
+        <!-- Injected dynamically by renderWorkbenchSubnav() -->
+      </nav>
 
       <!-- ================= MODULE 1: EXECUTIVE DASHBOARD ================= -->
       <section id="view-dashboard" class="module-view active">
@@ -426,6 +341,62 @@
             </div>
           </div>
         </div>
+
+        <!-- ================= SUSPECT THREAT RISK PROFILING & ARCHETYPE RADAR ================= -->
+        <div class="card" style="margin-top: 16px; border-left: 4px solid #f59e0b;">
+          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div class="card-title" style="display: flex; align-items: center; gap: 8px;">
+                <span>🎯</span>
+                <span>Suspect Threat Risk Profiling &amp; Archetype Classifier</span>
+                <span class="badge-amber" style="font-size: 10px; font-weight: 700;">AI RADAR</span>
+              </div>
+              <p style="font-size: 11.5px; color: var(--text-muted); margin: 3px 0 0 0;">
+                Multi-factor objective risk scoring (0-100) based on nocturnal ratio, SIM hopping, impossible velocity, and syndicate bridges.
+              </p>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="loadSuspectThreatRadar()">🔄 Refresh Scoring</button>
+          </div>
+          <div class="card-body" style="padding-top: 10px;">
+            <div id="threat-cards-grid" class="threat-cards-grid">
+              <div class="empty-state" style="padding: 20px;">Loading suspect threat scores...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================= 24x7 TEMPORAL ACTIVITY HEATMAP ================= -->
+        <div class="card" style="margin-top: 16px;">
+          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div class="card-title" style="display: flex; align-items: center; gap: 8px;">
+                <span>🗓️</span>
+                <span>24x7 Syndicate Activity Heatmap (7 Days × 24 Hours)</span>
+              </div>
+              <p style="font-size: 11.5px; color: var(--text-muted); margin: 3px 0 0 0;">
+                Pinpoints nocturnal syndicate operations, peak cyber fraud calling windows, and silence anomaly periods.
+              </p>
+            </div>
+            <div id="heatmap-busiest-pill" class="badge-blue" style="padding: 4px 10px; font-size: 11px;">
+              Busiest: Analyzing...
+            </div>
+          </div>
+          <div class="card-body" style="padding-top: 10px;">
+            <div class="heatmap-container" style="overflow-x: auto;">
+              <div id="heatmap-grid-24x7" class="heatmap-grid-24x7">
+                <!-- Dynamic 7x24 grid cells rendered by render24x7Heatmap() -->
+              </div>
+            </div>
+            <div class="heatmap-legend" style="display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 10px; font-size: 11px; color: var(--text-muted);">
+              <span>0 Calls</span>
+              <span class="heat-swatch heat-lvl-0"></span>
+              <span class="heat-swatch heat-lvl-1"></span>
+              <span class="heat-swatch heat-lvl-2"></span>
+              <span class="heat-swatch heat-lvl-3"></span>
+              <span class="heat-swatch heat-lvl-4"></span>
+              <span>Peak Activity</span>
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- ================= MODULE 2: RAW CDR DATA ================= -->
@@ -529,7 +500,58 @@
               <button class="btn btn-gold btn-sm" onclick="explainNetworkWithAI()">🤖 AI Explain Graph</button>
             </div>
           </div>
-          <div id="network-container"></div>
+          <div class="network-wrapper" style="position: relative; overflow: hidden; border-radius: 8px;">
+            <div id="network-container"></div>
+            
+            <!-- CYTOSCAPE SLIDE-IN NODE EVIDENCE DRAWER -->
+            <div id="node-inspector-drawer" class="node-inspector-drawer">
+              <div class="drawer-header">
+                <div class="drawer-title-group">
+                  <span class="drawer-icon">🔬</span>
+                  <div>
+                    <div id="drawer-node-title" class="drawer-title">+91 98290 XXXXX</div>
+                    <div id="drawer-node-subtitle" class="drawer-subtitle">Target Profile &amp; Section 65B Lineage</div>
+                  </div>
+                </div>
+                <button class="drawer-close-btn" onclick="closeNodeInspectorDrawer()">✕</button>
+              </div>
+              <div class="drawer-body">
+                <div class="drawer-stats-row">
+                  <div class="drawer-stat-chip">
+                    <span class="stat-lbl">Centrality Rank</span>
+                    <span class="stat-val" id="drawer-stat-centrality">-</span>
+                  </div>
+                  <div class="drawer-stat-chip">
+                    <span class="stat-lbl">Total Degree</span>
+                    <span class="stat-val" id="drawer-stat-degree">-</span>
+                  </div>
+                  <div class="drawer-stat-chip">
+                    <span class="stat-lbl">Target Status</span>
+                    <span class="stat-val" id="drawer-stat-status">-</span>
+                  </div>
+                </div>
+
+                <div class="drawer-section">
+                  <div class="drawer-section-title">👥 Connected Targets in Case</div>
+                  <div id="drawer-connections-list" class="drawer-connections-list"></div>
+                </div>
+
+                <div class="drawer-section">
+                  <div class="drawer-section-title">⚖️ Section 65B Admissible Records (Lineage)</div>
+                  <div id="drawer-evidence-list" class="drawer-evidence-list"></div>
+                </div>
+
+                <div class="drawer-actions">
+                  <button class="btn btn-primary btn-sm" id="btn-drawer-link-analysis" onclick="runDrawerLinkAnalysis()">
+                    🔗 Deep Link Analysis
+                  </button>
+                  <button class="btn btn-outline btn-sm" id="btn-drawer-filter-cdr" onclick="runDrawerFilterCdr()">
+                    📑 View in Raw CDR
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
           <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 12px; color: var(--text-muted);">
             <span>🔴 Suspect Nodes | 🔵 Associate / Common Nodes | Edge Width = Call Volume | Node Size = Degree</span>
             <span id="network-stats-label">Loading network topology...</span>
@@ -872,6 +894,27 @@
             </div>
           </div>
           <div id="map-container"></div>
+
+          <!-- ANIMATED TRAJECTORY PLAYBACK CONTROLS (NEW) -->
+          <div class="trajectory-scrubber-bar" id="trajectory-scrubber-bar" style="margin-top: 12px; padding: 10px 14px; background: rgba(15, 23, 42, 0.7); border: 1px solid #334155; border-radius: 8px; display: flex; align-items: center; gap: 14px;">
+            <button class="btn btn-outline btn-sm" id="btn-trajectory-play" onclick="toggleTrajectoryPlayback()" style="min-width: 100px;">
+              ▶️ Play Route
+            </button>
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+              <input type="range" id="trajectory-time-slider" min="0" max="0" value="0" step="1" oninput="handleTrajectorySlider(this.value)" style="width: 100%; cursor: pointer;">
+              <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
+                <span id="trajectory-start-lbl">Origin</span>
+                <span id="trajectory-current-lbl" style="color: #38bdf8; font-weight: 600;">Slider at Start</span>
+                <span id="trajectory-end-lbl">Destination</span>
+              </div>
+            </div>
+            <select id="trajectory-speed-select" class="form-control" style="width: 85px; padding: 3px 6px; font-size: 11px;" onchange="setTrajectorySpeed(this.value)">
+              <option value="1">1x Speed</option>
+              <option value="2">2x Speed</option>
+              <option value="4">4x Speed</option>
+            </select>
+          </div>
+
           <div style="margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
             <span style="font-size: 12px; color: var(--text-secondary);">Numbered sequence points trace movement of target handset across Rajasthan cell sites.</span>
             <span id="map-event-count" style="font-size: 12px; color: #38bdf8;">-</span>
@@ -1126,6 +1169,58 @@
         </div>
       </section>
 
+      <!-- ================= MODULE 21B: BATCH IPDR NAT RESOLVER ================= -->
+      <section id="view-batch-ipdr" class="module-view">
+        <div class="card">
+          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div class="card-title">⚡ Batch IPDR Carrier NAT Resolver (1930 Cyber Fraud &amp; Bank Logs)</div>
+              <p style="color: var(--text-muted); font-size: 11.5px; margin: 3px 0 0 0;">
+                Resolve bulk Public NAT IP + Port + Timestamp records against carrier session tables in seconds.
+              </p>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-outline btn-sm" onclick="loadBatchIpdrSample()">📋 Load Demo 1930 Feed</button>
+              <button class="btn btn-primary btn-sm" onclick="runBatchIpdrLookup()">⚡ Resolve All Sessions</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="form-group" style="margin-bottom: 12px;">
+              <label class="form-label" style="font-weight: 600;">Paste Queries (Format: <code>IP:Port, Timestamp</code> or CSV with header <code>ip,port,timestamp</code>):</label>
+              <textarea id="batch-ipdr-input" class="form-control" rows="5" placeholder="103.211.54.12:44321, 2026-11-20 18:25:10&#10;103.211.54.88:51234, 2026-11-18 23:14:00&#10;103.211.68.38:28083, 2026-11-17 01:12:40"></textarea>
+            </div>
+            <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 16px;">
+              <label class="form-label" style="margin: 0;">Carrier NAT Tolerance Window (minutes):</label>
+              <input type="number" id="batch-ipdr-tolerance" class="form-control" style="width: 80px;" value="15" min="1" max="120">
+              <span style="font-size: 11.5px; color: var(--text-muted);">Accounts for NTP clock drift between bank servers and telecom switches.</span>
+            </div>
+
+            <div id="batch-ipdr-results" style="display: none;">
+              <div id="batch-ipdr-summary-banner" style="margin-bottom: 12px; padding: 10px 14px; border-radius: 6px; background: rgba(15, 23, 42, 0.7); border: 1px solid #334155; display: flex; justify-content: space-between; align-items: center;">
+                <span id="batch-ipdr-stats" style="font-weight: 600; color: #f8fafc;">Matched 0 of 0 queries</span>
+                <span id="batch-ipdr-subs-pill" class="badge-blue">0 Subscribers</span>
+              </div>
+              <div class="table-container">
+                <table class="data-table" id="batch-ipdr-table">
+                  <thead>
+                    <tr>
+                      <th>Query ID</th>
+                      <th>Public NAT IP:Port</th>
+                      <th>Query Timestamp</th>
+                      <th>Match Status</th>
+                      <th>Attributed Subscriber</th>
+                      <th>App / Protocol Hint</th>
+                      <th>Evidentiary Lineage</th>
+                    </tr>
+                  </thead>
+                  <tbody id="batch-ipdr-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- ================= MODULE 22: AI ASSISTANT CHAT ================= -->
       <section id="view-assistant" class="module-view">
         <div class="card" style="padding: 10px 16px; margin-bottom: 12px; background: rgba(30, 58, 138, 0.2); border: 1px solid #1e3a8a;">
@@ -1308,12 +1403,33 @@
       <!-- ================= MODULE 25: AUDIT LOG (SECTION 65B) ================= -->
       <section id="view-audit" class="module-view">
         <div class="card">
-          <div class="card-header">
-            <div class="card-title">🛡️ System Security &amp; Section 65B Audit Log</div>
-            <button class="btn btn-outline btn-sm" onclick="loadAuditLogs()">Refresh Logs</button>
+          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <div class="card-title">🛡️ System Security &amp; Section 65B Cryptographic Audit Log</div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-outline btn-sm" onclick="runAuditChainVerification()">🔍 Verify SHA-256 Chain</button>
+              <button class="btn btn-outline btn-sm" onclick="loadAuditLogs()">Refresh Logs</button>
+            </div>
           </div>
+
+          <!-- AUDIT CHAIN INTEGRITY STATUS BANNER -->
+          <div class="audit-chain-banner" id="audit-chain-banner" style="margin-bottom: 14px; padding: 12px 16px; background: rgba(15, 23, 42, 0.7); border: 1px solid #334155; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="font-size: 24px;">🔐</span>
+              <div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-weight: 700; font-size: 13px; color: #f8fafc;">Section 65B Cryptographic Merkle Hash Chain</span>
+                  <span id="audit-integrity-badge" class="badge-blue" style="font-size: 10px;">CHAIN READY</span>
+                </div>
+                <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">
+                  Latest State Hash: <code id="audit-latest-hash" style="color: #38bdf8; font-family: monospace;">Awaiting verification...</code>
+                </div>
+              </div>
+            </div>
+            <div id="audit-verified-count" style="font-size: 12px; color: #10b981; font-weight: 600;">-</div>
+          </div>
+
           <p style="color: var(--text-muted); font-size: 12px; margin-bottom: 12px;">
-            Logs every user login, data upload, pattern query, AI assistant question, evidence inspection, observation verification, and report download with username, role, timestamp, and IP address.
+            Immutable SHA-256 chained audit trail of every officer login, upload, query, AI interaction, evidence inspection, and report export under Section 65B(4) Indian Evidence Act / Section 63 BSA 2023.
           </p>
           <div class="table-container">
             <table id="audit-table">
@@ -1321,15 +1437,16 @@
                 <tr>
                   <th>ID</th>
                   <th>Timestamp (UTC)</th>
-                  <th>Officer / User</th>
+                  <th>Officer</th>
                   <th>Role</th>
                   <th>Action</th>
                   <th>Details</th>
                   <th>IP Address</th>
+                  <th>SHA-256 Entry Hash</th>
                 </tr>
               </thead>
               <tbody id="audit-table-body">
-                <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Loading audit logs...</td></tr>
+                <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Loading audit logs...</td></tr>
               </tbody>
             </table>
           </div>

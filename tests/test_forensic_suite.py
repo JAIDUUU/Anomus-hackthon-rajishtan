@@ -666,6 +666,68 @@ def test_enriched_statutory_reports(client, auth_headers):
     assert "SECTION 65B" in str(ws_audit.cell(row=1, column=1).value)
 
 
+def test_frontend_7_workbenches_and_visual_command_center(client):
+    r = client.get("/")
+    assert r.status_code == 200
+    html = r.text
+
+    # 1. Verify 7 Workbenches buttons in sidebar
+    workbenches = [
+        "wb-btn-command",
+        "wb-btn-import",
+        "wb-btn-behavior",
+        "wb-btn-geo",
+        "wb-btn-network",
+        "wb-btn-device-cyber",
+        "wb-btn-legal-audit"
+    ]
+    for wb in workbenches:
+        assert f'id="{wb}"' in html, f"Missing workbench button: {wb}"
+
+    # 2. Verify subnav container
+    assert 'id="workbench-subnav"' in html
+
+    # 3. Verify new visual intelligence components
+    new_components = [
+        "threat-cards-grid",
+        "heatmap-grid-24x7",
+        "node-inspector-drawer",
+        "trajectory-scrubber-bar",
+        "view-batch-ipdr",
+        "audit-chain-banner"
+    ]
+    for comp in new_components:
+        assert comp in html, f"Missing visual component: {comp}"
+
+    # 4. Verify all major legacy views remain intact inside workbenches
+    legacy_views = [
+        "view-dashboard",
+        "view-raw-cdr",
+        "view-mfc",
+        "view-graph",
+        "view-first-last",
+        "view-day-night",
+        "view-missing-dates",
+        "view-movement",
+        "view-service-numbers",
+        "view-international",
+        "view-geo-map",
+        "view-common-numbers",
+        "view-meetings",
+        "view-imei-summary",
+        "view-imsi-summary",
+        "view-device-changes",
+        "view-ipdr",
+        "view-assistant",
+        "view-reports",
+        "view-import",
+        "view-audit"
+    ]
+    for v in legacy_views:
+        assert f'id="{v}"' in html, f"Missing legacy view container: {v}"
+
+
+
 
 
 

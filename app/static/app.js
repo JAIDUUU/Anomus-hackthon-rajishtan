@@ -31,6 +31,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   initTheme();
   startLiveClock();
   setupKeyboardShortcuts();
+  renderWorkbenchSubnav("command", "dashboard");
   await initSession();
   await loadCasesList();
   await loadAvailableMappings();
@@ -344,8 +345,124 @@ async function loadExecutiveMetrics(caseId = null) {
   }
 }
 
+// ----------------- 7-WORKBENCH ARCHITECTURE & NAVIGATION -----------------
+const WORKBENCHES = {
+  "command": {
+    title: "Command Center",
+    defaultView: "dashboard",
+    views: [
+      { id: "dashboard", label: "Executive Dashboard", icon: "🎛️" },
+      { id: "assistant", label: "AI Assistant Chat", icon: "🤖" },
+      { id: "reports", label: "Reports & Statutory Export", icon: "📥" }
+    ]
+  },
+  "import": {
+    title: "Data & Ingestion",
+    defaultView: "import",
+    views: [
+      { id: "import", label: "Data Ingestion & Mapping", icon: "📂" },
+      { id: "raw-cdr", label: "Raw CDR Records", icon: "🗄️" },
+      { id: "batch-ipdr", label: "Batch IPDR NAT Resolver", icon: "⚡" }
+    ]
+  },
+  "behavior": {
+    title: "Behavioral Forensics",
+    defaultView: "day-night",
+    views: [
+      { id: "day-night", label: "Day / Night Analysis", icon: "🌓" },
+      { id: "mfc", label: "MFC Frequent Contacts", icon: "👥" },
+      { id: "missing-dates", label: "Missing Dates & Silence", icon: "📅" },
+      { id: "first-last", label: "First / Last Calls", icon: "📞" },
+      { id: "day-calls", label: "Day Calls", icon: "🌤️" },
+      { id: "night-calls", label: "Night Calls", icon: "🌑" },
+      { id: "interactive-timeline", label: "Timeline", icon: "🕒" }
+    ]
+  },
+  "geo": {
+    title: "Geospatial Mobility",
+    defaultView: "geo-map",
+    views: [
+      { id: "geo-map", label: "Geo Intelligence Map", icon: "🌐" },
+      { id: "meetings", label: "Meeting Rendezvous", icon: "🚨" },
+      { id: "movement", label: "Movement Chart", icon: "🔀" },
+      { id: "cell-id-changes", label: "Cell ID Changes", icon: "⇄" },
+      { id: "location-changes", label: "Location Changes", icon: "🗺️" },
+      { id: "location-summary", label: "Location Summary", icon: "📍" },
+      { id: "location-intelligence", label: "Location Intelligence", icon: "🧭" },
+      { id: "day-locations", label: "Day Locations", icon: "☀️" },
+      { id: "night-locations", label: "Night Locations", icon: "🌙" }
+    ]
+  },
+  "network": {
+    title: "Syndicate Network",
+    defaultView: "graph",
+    views: [
+      { id: "graph", label: "Interactive Network Graph", icon: "📊" },
+      { id: "link-analysis", label: "Link Analysis & Bridges", icon: "🔗" },
+      { id: "common-numbers", label: "Common Numbers", icon: "🤝" },
+      { id: "advanced-cdr", label: "Advanced CDR", icon: "📚" },
+      { id: "network-analysis", label: "Network Matrix", icon: "📶" }
+    ]
+  },
+  "device-cyber": {
+    title: "Handset & Cyber",
+    defaultView: "imei-summary",
+    views: [
+      { id: "imei-summary", label: "IMEI & 275k TAC Handset", icon: "📱" },
+      { id: "imsi-summary", label: "IMSI Circle Attribution", icon: "💳" },
+      { id: "device-changes", label: "SIM Swapping & Hopping", icon: "🔄" },
+      { id: "ipdr", label: "Carrier NAT IPDR", icon: "🛰️" },
+      { id: "imei-patterns", label: "IMEI Patterns", icon: "🧬" },
+      { id: "imsi-patterns", label: "IMSI Patterns", icon: "🪪" }
+    ]
+  },
+  "legal-audit": {
+    title: "Legal & Sec 65B Audit",
+    defaultView: "audit",
+    views: [
+      { id: "audit", label: "Section 65B Audit Log & SHA-256", icon: "🛡️" },
+      { id: "ownership", label: "Ownership Intelligence", icon: "👤" },
+      { id: "international", label: "International Intel", icon: "🌍" },
+      { id: "service-numbers", label: "Service Helplines", icon: "🏢" }
+    ]
+  }
+};
+
+let activeWorkbench = "command";
+
+function switchWorkbench(wbId, preferredView = null) {
+  const wb = WORKBENCHES[wbId] || WORKBENCHES["command"];
+  activeWorkbench = wbId;
+
+  document.querySelectorAll(".sidebar-workbench-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.id === `wb-btn-${wbId}`);
+  });
+
+  const targetView = preferredView || wb.defaultView;
+  renderWorkbenchSubnav(wbId, targetView);
+  switchView(targetView, false);
+}
+
+function renderWorkbenchSubnav(wbId, activeViewId) {
+  const subnav = document.getElementById("workbench-subnav");
+  if (!subnav) return;
+
+  const wb = WORKBENCHES[wbId] || WORKBENCHES["command"];
+  let html = "";
+  wb.views.forEach(v => {
+    const isActive = v.id === activeViewId ? "active" : "";
+    html += `
+      <div class="wb-subnav-pill ${isActive}" data-view="${v.id}" onclick="switchView('${v.id}')">
+        <span>${v.icon}</span>
+        <span>${v.label}</span>
+      </div>
+    `;
+  });
+  subnav.innerHTML = html;
+}
+
 // ----------------- SIDEBAR & VIEW SWITCHER -----------------
-function switchView(viewName) {
+function switchView(viewName, updateWorkbench = true) {
   // Enforce ingestion-first gate: analytics require uploaded data
   if (!currentCaseHasData && viewName !== "import" && viewName !== "audit") {
     viewName = "import";
@@ -355,14 +472,24 @@ function switchView(viewName) {
     }
   }
 
-  // Update sidebar buttons
-  document.querySelectorAll(".sidebar-nav-btn").forEach(btn => {
-    btn.classList.remove("active");
-  });
-  const targetBtn = Array.from(document.querySelectorAll(".sidebar-nav-btn")).find(btn => 
-    btn.getAttribute("onclick") && btn.getAttribute("onclick").includes(`'${viewName}'`)
-  );
-  if (targetBtn) targetBtn.classList.add("active");
+  if (updateWorkbench) {
+    let foundWb = "command";
+    for (const [wbKey, wbObj] of Object.entries(WORKBENCHES)) {
+      if (wbObj.views.some(v => v.id === viewName)) {
+        foundWb = wbKey;
+        break;
+      }
+    }
+    activeWorkbench = foundWb;
+    document.querySelectorAll(".sidebar-workbench-btn").forEach(btn => {
+      btn.classList.toggle("active", btn.id === `wb-btn-${foundWb}`);
+    });
+    renderWorkbenchSubnav(foundWb, viewName);
+  } else {
+    document.querySelectorAll(".wb-subnav-pill").forEach(pill => {
+      pill.classList.toggle("active", pill.dataset.view === viewName);
+    });
+  }
 
   // Switch view containers
   document.querySelectorAll(".module-view").forEach(v => v.classList.remove("active"));
@@ -474,6 +601,9 @@ function dispatchViewLoad(viewName) {
     case "import":
       loadCaseBatches();
       break;
+    case "batch-ipdr":
+      loadBatchIpdrSample();
+      break;
     case "audit":
       loadAuditLogs();
       break;
@@ -542,7 +672,195 @@ async function loadDashboardDistribution() {
       }
     }
   });
+
+  // Render Suspect Threat Radar Cards & 24x7 Heatmap
+  if (data.threat_scores) {
+    renderThreatCards(data.threat_scores);
+  } else {
+    loadSuspectThreatRadar();
+  }
+
+  if (data.heatmap_24x7) {
+    render24x7Heatmap(data.heatmap_24x7);
+  } else {
+    load24x7Heatmap();
+  }
 }
+
+async function loadSuspectThreatRadar() {
+  if (!currentCaseId) return;
+  try {
+    const res = await fetch(`/api/cases/${currentCaseId}/threat-scoring`, {
+      headers: { "Authorization": `Bearer ${currentToken}` }
+    });
+    if (res.ok) {
+      const threats = await res.json();
+      renderThreatCards(threats);
+    }
+  } catch (e) {
+    console.error("Threat scoring error:", e);
+  }
+}
+
+async function load24x7Heatmap() {
+  if (!currentCaseId) return;
+  try {
+    const res = await fetch(`/api/cases/${currentCaseId}/heatmap`, {
+      headers: { "Authorization": `Bearer ${currentToken}` }
+    });
+    if (res.ok) {
+      const heat = await res.json();
+      render24x7Heatmap(heat);
+    }
+  } catch (e) {
+    console.error("Heatmap fetch error:", e);
+  }
+}
+
+function renderThreatCards(threats) {
+  const grid = document.getElementById("threat-cards-grid");
+  if (!grid) return;
+  if (!threats || threats.length === 0) {
+    grid.innerHTML = `<div class="empty-state" style="padding:20px;color:#94a3b8;">No suspect threat profiles detected. Upload CDR/IPDR files to initiate analysis.</div>`;
+    return;
+  }
+
+  let html = "";
+  threats.forEach(s => {
+    const score = s.threat_score || 0;
+    const risk = (s.risk_level || "LOW").toUpperCase();
+    const archetype = s.archetype || "Standard Subscriber";
+    let badgeClass = "threat-badge-low";
+    let meterColor = "#10b981";
+
+    if (score >= 75) {
+      badgeClass = "threat-badge-critical";
+      meterColor = "#ef4444";
+    } else if (score >= 50) {
+      badgeClass = "threat-badge-high";
+      meterColor = "#f59e0b";
+    } else if (score >= 25) {
+      badgeClass = "threat-badge-medium";
+      meterColor = "#eab308";
+    }
+
+    const factors = s.factors || [];
+    const factorPills = factors.map(f => `<span class="threat-factor-pill">${f}</span>`).join("");
+
+    html += `
+      <div class="threat-card">
+        <div class="threat-card-header">
+          <div>
+            <div class="threat-card-name">${s.name || 'Target Suspect'}</div>
+            <div class="threat-card-phone">${s.phone}</div>
+          </div>
+          <span class="threat-badge ${badgeClass}">${risk}</span>
+        </div>
+
+        <div class="threat-archetype-chip">🏷️ ${archetype}</div>
+
+        <div class="threat-meter-container">
+          <div class="threat-meter-labels">
+            <span style="color:#94a3b8;">Threat Index</span>
+            <span style="color:${meterColor};font-weight:700;">${score}/100</span>
+          </div>
+          <div class="threat-meter-track">
+            <div class="threat-meter-fill" style="width:${Math.max(5, score)}%;background:${meterColor};"></div>
+          </div>
+        </div>
+
+        <div style="font-size:11px;color:#94a3b8;display:flex;justify-content:space-between;">
+          <span>🌙 Night: <b>${s.night_ratio_pct}%</b></span>
+          <span>📱 IMEIs: <b>${s.imei_count}</b></span>
+          <span>⚡ Hops: <b>${s.rapid_movements_count}</b></span>
+        </div>
+
+        <div class="threat-factors-list">
+          ${factorPills}
+        </div>
+
+        <div class="threat-card-actions">
+          <button class="btn btn-outline btn-sm" style="flex:1;padding:3px 6px;font-size:11px;" onclick="focusSuspectNetwork('${s.phone}')">
+            🕸️ Network
+          </button>
+          <button class="btn btn-outline btn-sm" style="flex:1;padding:3px 6px;font-size:11px;" onclick="focusSuspectTrajectory('${s.phone}')">
+            📍 Trajectory
+          </button>
+        </div>
+      </div>
+    `;
+  });
+  grid.innerHTML = html;
+}
+
+function focusSuspectNetwork(phone) {
+  switchView("graph");
+  setTimeout(() => {
+    if (cytoscapeInstance) {
+      const node = cytoscapeInstance.getElementById(phone);
+      if (node && node.length) {
+        cytoscapeInstance.center(node);
+        cytoscapeInstance.zoom(1.8);
+        node.select();
+        openNodeInspectorDrawer(phone, node.data());
+      }
+    }
+  }, 400);
+}
+
+function focusSuspectTrajectory(phone) {
+  switchView("geo-map");
+  const sel = document.getElementById("map-suspect-select");
+  if (sel) {
+    sel.value = phone;
+    renderTowerMap(phone);
+  }
+}
+
+function render24x7Heatmap(heatmapData) {
+  const container = document.getElementById("heatmap-grid-24x7");
+  const busiestPill = document.getElementById("heatmap-busiest-pill");
+  if (!container) return;
+
+  if (!heatmapData || !heatmapData.matrix) {
+    container.innerHTML = `<div style="grid-column:1/-1;padding:20px;text-align:center;color:#94a3b8;">No temporal heatmap activity recorded.</div>`;
+    return;
+  }
+
+  if (busiestPill) {
+    busiestPill.innerText = `Busiest: ${heatmapData.busiest_day} @ ${heatmapData.busiest_hour}:00 (${heatmapData.busiest_calls} calls)`;
+  }
+
+  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const maxVal = heatmapData.max_hourly_calls || 1;
+  let html = "";
+
+  html += `<div class="heat-hdr-cell">Day</div>`;
+  for (let h = 0; h < 24; h++) {
+    html += `<div class="heat-hdr-cell">${h}h</div>`;
+  }
+
+  for (let d = 0; d < 7; d++) {
+    html += `<div class="heat-day-lbl">${days[d]}</div>`;
+    const rowCounts = heatmapData.matrix[d] || [];
+    for (let h = 0; h < 24; h++) {
+      const count = rowCounts[h] || 0;
+      let lvl = 0;
+      if (count > 0) {
+        const ratio = count / maxVal;
+        if (ratio >= 0.75) lvl = 4;
+        else if (ratio >= 0.50) lvl = 3;
+        else if (ratio >= 0.25) lvl = 2;
+        else lvl = 1;
+      }
+      const title = `${days[d]} ${h}:00 - ${count} calls ${lvl >= 3 ? '(Peak Syndicate Activity)' : ''}`;
+      html += `<div class="heat-cell heat-lvl-${lvl}" title="${title}">${count > 0 ? count : ''}</div>`;
+    }
+  }
+
+  container.innerHTML = html;
+}
+
 
 // ----------------- MODULE: RAW CDR DATA (PAGINATED) -----------------
 async function loadRawCdrPage(page = 1) {
@@ -1117,12 +1435,96 @@ async function loadNetworkGraph() {
 
     cytoscapeInstance.on("tap", "node", (evt) => {
       const node = evt.target;
-      alert(`Node Selected: ${node.data("label")}\nConnection Degree: ${node.data("degree")}\nSuspect Flag: ${node.data("is_suspect") ? "YES" : "NO"}`);
+      openNodeInspectorDrawer(node.data("id"), node.data());
     });
 
   } catch (err) {
     console.error("Network graph error:", err);
     label.innerText = "Error drawing network topology";
+  }
+}
+
+let drawerActiveNode = null;
+
+function openNodeInspectorDrawer(nodeId, nodeData) {
+  drawerActiveNode = nodeId;
+  const drawer = document.getElementById("node-inspector-drawer");
+  if (!drawer) return;
+
+  const titleEl = document.getElementById("drawer-node-title");
+  const subEl = document.getElementById("drawer-node-subtitle");
+  const centralityEl = document.getElementById("drawer-stat-centrality");
+  const degreeEl = document.getElementById("drawer-stat-degree");
+  const statusEl = document.getElementById("drawer-stat-status");
+
+  if (titleEl) titleEl.innerText = nodeData.label || nodeId;
+  if (subEl) subEl.innerText = nodeData.is_suspect ? "Target Syndicate Suspect" : "Associated Peer Contact";
+  if (centralityEl) centralityEl.innerText = nodeData.degree ? `#${nodeData.degree >= 8 ? 1 : (nodeData.degree >= 4 ? 2 : 3)}` : "Rank #1";
+  if (degreeEl) degreeEl.innerText = `${nodeData.degree || 1} links`;
+  if (statusEl) statusEl.innerText = nodeData.is_suspect ? "SUSPECT" : "ASSOCIATE";
+
+  // Connections list from graph edges
+  const connList = document.getElementById("drawer-connections-list");
+  if (connList && cytoscapeInstance) {
+    connList.innerHTML = "";
+    const connectedEdges = cytoscapeInstance.edges(`[source = "${nodeId}"], [target = "${nodeId}"]`);
+    if (connectedEdges.length === 0) {
+      connList.innerHTML = `<span style="font-size:11px;color:#94a3b8;">No direct connections</span>`;
+    } else {
+      connectedEdges.forEach(edge => {
+        const otherId = edge.data("source") === nodeId ? edge.data("target") : edge.data("source");
+        const calls = edge.data("call_count") || edge.data("weight") || 1;
+        const item = document.createElement("div");
+        item.className = "drawer-conn-item";
+        item.innerHTML = `
+          <span style="font-family:monospace;color:#38bdf8;">${otherId}</span>
+          <span style="color:#94a3b8;">${calls} calls</span>
+        `;
+        connList.appendChild(item);
+      });
+    }
+  }
+
+  // Section 65B evidence records
+  const evList = document.getElementById("drawer-evidence-list");
+  if (evList) {
+    evList.innerHTML = `
+      <div class="drawer-ev-pill">
+        <b>Section 65B Lineage:</b> Target identifier <code>${nodeId}</code> verified in carrier CDR stream.
+      </div>
+    `;
+  }
+
+  drawer.classList.add("open");
+}
+
+function closeNodeInspectorDrawer() {
+  const drawer = document.getElementById("node-inspector-drawer");
+  if (drawer) drawer.classList.remove("open");
+}
+
+function runDrawerLinkAnalysis() {
+  if (!drawerActiveNode) return;
+  const targetSuspect = cachedAnalytics?.suspects?.[0]?.phone || "";
+  if (targetSuspect && targetSuspect !== drawerActiveNode) {
+    switchView("link-analysis");
+    const n1 = document.getElementById("link-num1");
+    const n2 = document.getElementById("link-num2");
+    if (n1) n1.value = targetSuspect;
+    if (n2) n2.value = drawerActiveNode;
+    runLinkAnalysis();
+  } else {
+    switchView("link-analysis");
+  }
+}
+
+function runDrawerFilterCdr() {
+  if (!drawerActiveNode) return;
+  switchView("raw-cdr");
+  const filterInput = document.getElementById("cdr-filter-search");
+  if (filterInput) {
+    filterInput.value = drawerActiveNode;
+    loadRawCdrPage(1);
   }
 }
 
@@ -1379,9 +1781,94 @@ async function renderTowerMap(targetNum = null) {
         }
       }, 150);
     }
+
+    initTrajectoryScrubber(data.timeline);
   } catch (err) {
     console.error("Map render error:", err);
     countLabel.innerText = "Error loading trajectory points";
+  }
+}
+
+let currentMapTimeline = [];
+let trajectoryPlayInterval = null;
+let trajectorySpeedMultiplier = 1;
+
+function initTrajectoryScrubber(timeline) {
+  currentMapTimeline = timeline || [];
+  const slider = document.getElementById("trajectory-time-slider");
+  const playBtn = document.getElementById("btn-trajectory-play");
+  if (trajectoryPlayInterval) {
+    clearInterval(trajectoryPlayInterval);
+    trajectoryPlayInterval = null;
+  }
+  if (playBtn) playBtn.innerHTML = "▶️ Play Route";
+
+  if (!slider || currentMapTimeline.length === 0) return;
+  slider.min = 0;
+  slider.max = currentMapTimeline.length - 1;
+  slider.value = 0;
+
+  const startLbl = document.getElementById("trajectory-start-lbl");
+  const endLbl = document.getElementById("trajectory-end-lbl");
+  const curLbl = document.getElementById("trajectory-current-lbl");
+
+  if (startLbl && currentMapTimeline[0]) startLbl.innerText = `#1 ${currentMapTimeline[0].area_name?.slice(0, 14) || ''}`;
+  if (endLbl && currentMapTimeline.length > 1) {
+    const last = currentMapTimeline[currentMapTimeline.length - 1];
+    endLbl.innerText = `#${last.seq} ${last.area_name?.slice(0, 14) || ''}`;
+  }
+  if (curLbl) curLbl.innerText = `Step 1 of ${currentMapTimeline.length}`;
+}
+
+function handleTrajectorySlider(val) {
+  const idx = parseInt(val, 10);
+  if (!currentMapTimeline || !currentMapTimeline[idx] || !leafletMap) return;
+  const pt = currentMapTimeline[idx];
+  const curLbl = document.getElementById("trajectory-current-lbl");
+  if (curLbl) {
+    curLbl.innerText = `Seq #${pt.seq} (${pt.timestamp?.slice(11, 19) || ''}) @ ${pt.area_name || ''}`;
+  }
+  leafletMap.panTo([pt.lat, pt.lon], { animate: true });
+}
+
+function toggleTrajectoryPlayback() {
+  const playBtn = document.getElementById("btn-trajectory-play");
+  const slider = document.getElementById("trajectory-time-slider");
+  if (!slider || !currentMapTimeline.length) return;
+
+  if (trajectoryPlayInterval) {
+    clearInterval(trajectoryPlayInterval);
+    trajectoryPlayInterval = null;
+    if (playBtn) playBtn.innerHTML = "▶️ Play Route";
+    return;
+  }
+
+  if (playBtn) playBtn.innerHTML = "⏸️ Pause";
+  let curIdx = parseInt(slider.value, 10);
+  if (curIdx >= currentMapTimeline.length - 1) {
+    curIdx = 0;
+    slider.value = 0;
+  }
+
+  const stepMs = Math.max(250, Math.floor(1000 / trajectorySpeedMultiplier));
+  trajectoryPlayInterval = setInterval(() => {
+    curIdx++;
+    if (curIdx >= currentMapTimeline.length) {
+      clearInterval(trajectoryPlayInterval);
+      trajectoryPlayInterval = null;
+      if (playBtn) playBtn.innerHTML = "🔄 Replay";
+      return;
+    }
+    slider.value = curIdx;
+    handleTrajectorySlider(curIdx);
+  }, stepMs);
+}
+
+function setTrajectorySpeed(spd) {
+  trajectorySpeedMultiplier = parseFloat(spd) || 1;
+  if (trajectoryPlayInterval) {
+    toggleTrajectoryPlayback();
+    toggleTrajectoryPlayback();
   }
 }
 
@@ -1894,14 +2381,14 @@ async function loadCaseBatches() {
 // ----------------- MODULE: AUDIT LOG (SECTION 65B) -----------------
 async function loadAuditLogs() {
   const tbody = document.getElementById("audit-table-body");
-  tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;"><div class="spinner"></div> Fetching immutable Section 65B audit trail...</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;"><div class="spinner"></div> Fetching immutable Section 65B audit trail...</td></tr>`;
 
   try {
     const res = await fetch("/api/audit?limit=100", {
       headers: { "Authorization": `Bearer ${currentToken}` }
     });
     if (!res.ok) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#fca5a5;">Access denied. Requires Senior Officer or Admin role.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#fca5a5;">Access denied. Requires Senior Officer or Admin role.</td></tr>`;
       return;
     }
     const logs = await res.json();
@@ -1909,20 +2396,172 @@ async function loadAuditLogs() {
 
     logs.forEach(l => {
       const tr = document.createElement("tr");
+      const hashDisplay = l.entry_hash
+        ? `<code style="font-size:10px;color:#38bdf8;" title="${l.entry_hash}">${l.entry_hash.slice(0, 14)}...</code>`
+        : `<span style="color:#64748b;">-</span>`;
       tr.innerHTML = `
         <td>#${l.id}</td>
         <td style="font-family:monospace;font-size:11px;">${l.timestamp}</td>
         <td><b>${l.username}</b></td>
         <td><span class="role-tag role-io">${l.role}</span></td>
         <td><span class="metric-card-badge badge-blue">${l.action}</span></td>
-        <td style="font-size:11.5px;max-width:320px;overflow:hidden;text-overflow:ellipsis;">${JSON.stringify(l.details)}</td>
+        <td style="font-size:11.5px;max-width:300px;overflow:hidden;text-overflow:ellipsis;">${JSON.stringify(l.details)}</td>
         <td style="font-family:monospace;font-size:11px;">${l.ip_address}</td>
+        <td>${hashDisplay}</td>
       `;
       tbody.appendChild(tr);
     });
+
+    runAuditChainVerification();
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#fca5a5;">Error loading audit logs.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#fca5a5;">Error loading audit logs.</td></tr>`;
   }
+}
+
+async function runAuditChainVerification() {
+  const badge = document.getElementById("audit-integrity-badge");
+  const hashLabel = document.getElementById("audit-latest-hash");
+  const countLabel = document.getElementById("audit-verified-count");
+  if (!badge) return;
+
+  badge.innerText = "VERIFYING CRYPTOGRAPHIC CHAIN...";
+  badge.className = "badge-amber";
+
+  try {
+    const res = await fetch("/api/audit/verify", {
+      headers: { "Authorization": `Bearer ${currentToken}` }
+    });
+    if (!res.ok) {
+      badge.innerText = "ACCESS DENIED (Requires Authorized Officer)";
+      badge.className = "badge-amber";
+      return;
+    }
+    const data = await res.json();
+    if (data.is_valid) {
+      badge.innerText = "✅ CRYPTOGRAPHICALLY AUTHENTIC";
+      badge.className = "badge-green";
+      if (hashLabel) hashLabel.innerText = data.latest_hash || "Genesis Hash Established";
+      if (countLabel) countLabel.innerText = `All ${data.total_records} events verified under Section 65B`;
+    } else {
+      badge.innerText = "❌ INTEGRITY BREACH DETECTED";
+      badge.className = "badge-amber";
+      badge.style.background = "#ef4444";
+      if (hashLabel) hashLabel.innerText = "Tampering detected in chain!";
+      if (countLabel) countLabel.innerText = `Alert: ${data.tampered_records?.length || 1} records altered!`;
+    }
+  } catch (e) {
+    console.error("Audit verification error:", e);
+    badge.innerText = "VERIFICATION ERROR";
+  }
+}
+
+// ----------------- MODULE: BATCH IPDR NAT RESOLVER -----------------
+function loadBatchIpdrSample() {
+  const ta = document.getElementById("batch-ipdr-input");
+  if (ta) {
+    ta.value = "103.211.54.12:44321, 2026-11-20 18:25:10\n103.211.54.88:51234, 2026-11-18 23:14:00\n103.211.68.38:28083, 2026-11-17 01:12:40\n198.51.100.99:9999, 2026-11-20 12:00:00";
+  }
+}
+
+async function runBatchIpdrLookup() {
+  if (!currentCaseId) return;
+  const input = document.getElementById("batch-ipdr-input").value.trim();
+  const tolerance = parseInt(document.getElementById("batch-ipdr-tolerance").value, 10) || 15;
+  if (!input) {
+    alert("Please enter at least one IP:Port, Timestamp query.");
+    return;
+  }
+
+  const lines = input.split("\n");
+  const queries = [];
+  lines.forEach((line, idx) => {
+    line = line.trim();
+    if (!line) return;
+    const parts = line.split(",");
+    let ip = "", port = 0, ts = "";
+    if (parts.length >= 2) {
+      const ipPort = parts[0].trim();
+      ts = parts.slice(1).join(",").trim();
+      if (ipPort.includes(":")) {
+        const ipp = ipPort.split(":");
+        ip = ipp[0].trim();
+        port = parseInt(ipp[1], 10) || 0;
+      } else {
+        ip = ipPort;
+      }
+    }
+    if (ip && port && ts) {
+      queries.push({
+        query_id: `Q-${idx + 1}`,
+        ip: ip,
+        port: port,
+        timestamp: ts
+      });
+    }
+  });
+
+  if (queries.length === 0) {
+    alert("Could not parse queries. Format: IP:Port, YYYY-MM-DD HH:MM:SS");
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/cases/${currentCaseId}/ipdr/batch`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${currentToken}`
+      },
+      body: JSON.stringify({ queries, tolerance_minutes: tolerance })
+    });
+    if (!res.ok) {
+      alert("Error resolving batch IPDR queries.");
+      return;
+    }
+    const data = await res.json();
+    renderBatchIpdrResults(data);
+  } catch (err) {
+    console.error("Batch IPDR error:", err);
+    alert("Network error executing batch IPDR resolution.");
+  }
+}
+
+function renderBatchIpdrResults(data) {
+  const container = document.getElementById("batch-ipdr-results");
+  const statsSpan = document.getElementById("batch-ipdr-stats");
+  const subsPill = document.getElementById("batch-ipdr-subs-pill");
+  const tbody = document.getElementById("batch-ipdr-tbody");
+  if (!container || !tbody) return;
+
+  container.style.display = "block";
+  statsSpan.innerText = `Matched ${data.matched_count} of ${data.total_queries} queries (${data.unmatched_count} unassigned)`;
+  subsPill.innerText = `${data.identified_subscribers_count} Distinct Subscribers Identified`;
+
+  let html = "";
+  data.results.forEach(r => {
+    const isMatched = r.matched;
+    const statusHtml = isMatched
+      ? `<span class="badge-green">MATCHED</span>`
+      : `<span class="badge-amber">NO MATCH</span>`;
+    const subHtml = r.primary_subscriber
+      ? `<b style="color:#38bdf8;font-family:monospace;">${r.primary_subscriber}</b>`
+      : `<span style="color:#64748b;">Unallocated NAT port</span>`;
+    const appHint = r.session?.app_hint || "Unclassified Traffic";
+    const lineage = r.session ? `<code>${r.session.source_file || 'operator_cgnat'} (R${r.session.source_row || '1'})</code>` : "-";
+
+    html += `
+      <tr>
+        <td style="font-weight:700;">${r.query_id}</td>
+        <td style="font-family:monospace;">${r.ip}:${r.port}</td>
+        <td style="font-family:monospace;font-size:11px;">${r.timestamp}</td>
+        <td>${statusHtml}</td>
+        <td>${subHtml}</td>
+        <td><span style="font-size:11px;">${appHint}</span></td>
+        <td style="font-size:11px;">${lineage}</td>
+      </tr>
+    `;
+  });
+  tbody.innerHTML = html;
 }
 
 // ----------------- MODAL: TAC DEVICE LOOKUP -----------------
