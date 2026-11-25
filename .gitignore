@@ -8,3 +8,5 @@ prototype.db.bak
 *.log
 .env
 .DS_Store
+.serena/
+.superpowers/

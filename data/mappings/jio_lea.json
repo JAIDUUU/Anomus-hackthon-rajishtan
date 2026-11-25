@@ -1,0 +1,27 @@
+{
+  "name": "Reliance Jio LEA Standard CDR",
+  "type": "CDR",
+  "description": "Official Reliance Jio Law Enforcement Agency (LEA) standard format with audio/VoLTE call indicators and cell IDs",
+  "mappings": {
+    "a_number": "Calling Party Telephone Number",
+    "b_number": "Called Party Telephone Number",
+    "call_type": "Call Type",
+    "start_time": ["Call Date", "Call Time"],
+    "duration_sec": "Call Duration",
+    "imei": "IMEI",
+    "imsi": "IMSI",
+    "cell_id": "First Cell ID"
+  },
+  "date_format": "%d/%m/%Y %H:%M:%S",
+  "duration_format": "seconds",
+  "call_type_mapping": {
+    "a_out": "OUT",
+    "v_out": "OUT",
+    "a_in": "IN",
+    "v_in": "IN",
+    "sms_out": "SMS",
+    "sms_in": "SMS",
+    "OUT": "OUT",
+    "IN": "IN"
+  }
+}

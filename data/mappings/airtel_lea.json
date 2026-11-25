@@ -1,0 +1,25 @@
+{
+  "name": "Bharti Airtel LEA Standard CDR",
+  "type": "CDR",
+  "description": "Standard Law Enforcement Agency (LEA) CDR format from Bharti Airtel PAN-India with First/Last CGI cell IDs",
+  "mappings": {
+    "a_number": "Target No",
+    "b_number": "B Party No",
+    "call_type": "Call Type",
+    "start_time": ["Date", "Time"],
+    "duration_sec": "Dur(s)",
+    "imei": "IMEI",
+    "imsi": "IMSI",
+    "cell_id": "First CGI"
+  },
+  "date_format": "%d/%m/%Y %H:%M:%S",
+  "duration_format": "seconds",
+  "call_type_mapping": {
+    "IN": "IN",
+    "OUT": "OUT",
+    "SMO": "SMS",
+    "SMT": "SMS",
+    "SMS": "SMS",
+    "CALL": "OUT"
+  }
+}

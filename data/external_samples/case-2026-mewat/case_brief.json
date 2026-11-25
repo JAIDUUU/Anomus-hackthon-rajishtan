@@ -1,0 +1,67 @@
+{
+  "case_id": "CASE-2026-MEWAT-001",
+  "title": "Mewat-Bharatpur Cyber Extortion & OLX Fraud Syndicate",
+  "description": "Cross-district organized cyber extortion ring based in Deeg/Kaman (Bharatpur Mewat region) with mule ATM cashouts in Jaipur and burner SIM rotations.",
+  "suspects": {
+    "KINGPIN": {
+      "number": "9829019999",
+      "name": "Arif Mewati (Syndicate Kingpin)",
+      "imei": "354890123999001",
+      "imsi": "404701234500001",
+      "base_tower": "RAJ-DEG-603"
+    },
+    "OPERATOR_1": {
+      "number": "9829028888",
+      "name": "Wasim Akram (OLX & Extortion Caller)",
+      "imei": "354890123888002",
+      "imsi": "404701234500002",
+      "base_tower": "RAJ-KMN-604"
+    },
+    "OPERATOR_2": {
+      "number": "9829037777",
+      "name": "Shahid Khan (SIM Provider & Tech Setup)",
+      "imei": "864698066777003",
+      "imsi": "405868123400003",
+      "base_tower": "RAJ-JUR-606"
+    },
+    "MULE_JAIPUR": {
+      "number": "9829046666",
+      "name": "Pankaj Sharma (Mule Cashout Operative - Old SIM)",
+      "imei": "352841104666004",
+      "imsi": "404601234500004",
+      "base_tower": "RAJ-JPR-101"
+    },
+    "MULE_JAIPUR_SWAP": {
+      "number": "9829095555",
+      "name": "Pankaj Sharma (Mule Cashout - Swapped SIM)",
+      "imei": "352841104666004",
+      "imsi": "404709999900005",
+      "base_tower": "RAJ-JPR-103"
+    },
+    "NIGHT_PHISHER": {
+      "number": "9829054444",
+      "name": "Imran Ali (Night Phishing Bulk Sender)",
+      "imei": "861768084444005",
+      "imsi": "405868555500006",
+      "base_tower": "RAJ-GPL-607"
+    }
+  },
+  "common_contacts": [
+    {
+      "number": "9414011223",
+      "name": "Hawala Courier - Jaipur Johri Bazar"
+    },
+    {
+      "number": "9414022334",
+      "name": "Forged SIM Wholesaler - Bharatpur"
+    },
+    {
+      "number": "9414033445",
+      "name": "Fake Aadhaar KYC Agent - Alwar"
+    }
+  ],
+  "cdr_count": 493,
+  "ipdr_count": 275,
+  "rendezvous_location": "Jaipur - Sindhi Camp Central Bus Stand (RAJ-JPR-101)",
+  "rendezvous_date": "2026-02-19 15:30:00"
+}

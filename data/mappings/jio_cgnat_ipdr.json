@@ -1,0 +1,17 @@
+{
+  "name": "Reliance Jio CGNAT IPDR Format",
+  "type": "IPDR",
+  "description": "Carrier-Grade NAT (CGNAT) IPDR log format from Reliance Jio with translated public IPs, source/destination ports and session volume",
+  "mappings": {
+    "subscriber_number": "Landline/MSISDN/MDN/Leased Circuit ID for Internet Access",
+    "source_ip": "Translated IP Address",
+    "source_port": "Translated Port",
+    "destination_ip": "Destination IP Address",
+    "destination_port": "Destination Port",
+    "session_start": "TIME1 (dd/MM/yyyy HH:mm:ss)",
+    "session_end": "TIME1 (dd/MM/yyyy HH:mm:ss)",
+    "bytes_transferred": "Data Volume Down Link",
+    "app_hint": "Access Point Name"
+  },
+  "date_format": "%d/%m/%Y %H:%M:%S"
+}
