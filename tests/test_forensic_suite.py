@@ -463,4 +463,40 @@ def test_api_inspect_and_ipdr_sample(client, auth_headers):
     assert r_demo.status_code in (404, 405)
 
 
+def test_lea_preamble_stripping_and_tower_master(client, auth_headers):
+    from app.db import get_db, CellTower
+    from app.ingest import seed_towers_from_csv
+    
+    # 1. Preamble stripping check via /api/ingest/inspect
+    raw_lea = (
+        "BHARTI AIRTEL LIMITED\n"
+        "\"\"\n"
+        "PAN India\n"
+        "Call Details of Mobile No '9829011111'\n"
+        "Target No,Call Type,B Party No,Date,Time,Dur(s),First CGI,IMEI,IMSI\n"
+        "9829011111,IN,9829022222,01/02/2026,10:00:00,45,RAJ-DEG-603,864698066569960,404971908560194\n"
+    ).encode("utf-8")
+
+    r_insp = client.post(
+        "/api/ingest/inspect",
+        files={"file": ("airtel_lea.csv", raw_lea, "text/csv")},
+        headers=auth_headers
+    )
+    assert r_insp.status_code == 200
+    data = r_insp.json()
+    assert "Target No" in data["columns"]
+    assert "First CGI" in data["columns"]
+    assert data["suggested_type"] == "CDR"
+    assert data["suggested_mapping"]["a_number"] == "Target No"
+
+    # 2. Check 66 Rajasthan tower master seeding includes Mewat sites like RAJ-DEG-603
+    db = next(get_db())
+    seed_towers_from_csv(db)
+    mewat_tower = db.query(CellTower).filter(CellTower.cell_id == "RAJ-DEG-603").first()
+    assert mewat_tower is not None
+    assert "Deeg" in mewat_tower.area_name
+    assert db.query(CellTower).count() >= 50
+
+
+
 

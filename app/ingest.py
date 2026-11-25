@@ -103,7 +103,7 @@ def parse_datetime_flexible(val, custom_fmt: str | None = None) -> str:
 
 
 def read_tabular_bytes(file_bytes: bytes, filename: str) -> tuple[pd.DataFrame, str]:
-    """Read CSV or Excel (.xlsx/.xls) bytes into a clean string DataFrame."""
+    """Read CSV or Excel (.xlsx/.xls) bytes into a clean string DataFrame, auto-skipping LEA report preambles."""
     if not file_bytes:
         raise ValueError("Uploaded file is empty")
 
@@ -117,8 +117,26 @@ def read_tabular_bytes(file_bytes: bytes, filename: str) -> tuple[pd.DataFrame, 
             raise ValueError(f"Invalid Excel file '{filename}': {e}")
     elif ext in (".csv", ".tsv", ".txt", ""):
         try:
-            sep = "\t" if ext == ".tsv" else ","
-            df = pd.read_csv(io.BytesIO(file_bytes), dtype=str, keep_default_na=False, sep=sep)
+            # Detect separator and inspect preamble
+            sample_head = file_bytes[:8192].decode("utf-8", errors="ignore")
+            sep = "\t" if (ext == ".tsv" or ("\t" in sample_head and sample_head.count("\t") > sample_head.count(","))) else ","
+
+            # Detect if preamble lines exist (e.g. Bharti Airtel / Reliance Jio LEA headers)
+            lines = sample_head.splitlines()
+            skip_rows = 0
+            for idx, line in enumerate(lines[:25]):
+                line_lower = line.lower()
+                tok_hits = sum(1 for tok in (
+                    "target", "calling", "called", "msisdn", "party", "time", "date",
+                    "duration", "dur", "cgi", "cell", "imei", "imsi", "source", "dest",
+                    "ip", "port", "session", "bytes", "subscriber"
+                ) if tok in line_lower)
+                # Header row candidate: contains delimiter and at least 2 telecom header tokens
+                if line.count(sep) >= 2 and tok_hits >= 2:
+                    skip_rows = idx
+                    break
+
+            df = pd.read_csv(io.BytesIO(file_bytes), dtype=str, keep_default_na=False, sep=sep, skiprows=skip_rows)
             df.columns = [str(c).strip() for c in df.columns]
             return df, "CSV"
         except Exception as e:
@@ -147,31 +165,31 @@ def inspect_uploaded_file(file_bytes: bytes, filename: str) -> dict:
         raise ValueError("No column headers found in uploaded file")
 
     norm_joined = " ".join(re.sub(r"[^a-z0-9]", "", c.lower()) for c in columns)
-    ipdr_score = sum(1 for tok in ("publicip", "sourceip", "natip", "srcip", "sourceport", "natport", "sessionstart", "bytestransferred") if tok in norm_joined)
+    ipdr_score = sum(1 for tok in ("publicip", "sourceip", "natip", "srcip", "sourceport", "natport", "sessionstart", "bytestransferred", "translatedip", "pgw") if tok in norm_joined)
     suggested_type = "IPDR" if ipdr_score >= 2 else "CDR"
 
     if suggested_type == "IPDR":
         suggested_mapping = {
-            "subscriber_number": _match_column_synonym(columns, ["subscribermsisdn", "subscribernumber", "msisdn", "phonenumber", "mobilenumber", "mobile", "subscriber"]),
-            "source_ip": _match_column_synonym(columns, ["sourceip", "publicnatip", "publicip", "srcip", "ipaddress", "ip"]),
-            "source_port": _match_column_synonym(columns, ["sourceport", "publicnatport", "natport", "srcport", "port"]),
+            "subscriber_number": _match_column_synonym(columns, ["subscribermsisdn", "subscribernumber", "msisdn", "phonenumber", "mobilenumber", "mobile", "subscriber", "contactno"]),
+            "source_ip": _match_column_synonym(columns, ["translatedip", "sourceip", "publicnatip", "publicip", "srcip", "ipaddress", "ip"]),
+            "source_port": _match_column_synonym(columns, ["translatedport", "sourceport", "publicnatport", "natport", "srcport", "port"]),
             "destination_ip": _match_column_synonym(columns, ["destinationip", "destip", "dstip", "targetip"]),
             "destination_port": _match_column_synonym(columns, ["destinationport", "destport", "dstport"]),
-            "session_start": _match_column_synonym(columns, ["sessionstart", "sessionstarttimestamp", "starttime", "starttimestamp", "timestamp"]),
+            "session_start": _match_column_synonym(columns, ["sessionstart", "sessionstarttimestamp", "starttime", "starttimestamp", "timestamp", "time1"]),
             "session_end": _match_column_synonym(columns, ["sessionend", "sessionendtimestamp", "endtime", "endtimestamp"]),
-            "bytes_transferred": _match_column_synonym(columns, ["bytestransferred", "totalbytestransferred", "bytes", "volume"]),
-            "app_hint": _match_column_synonym(columns, ["appprotocolhint", "apphint", "application", "protocol", "service"]),
+            "bytes_transferred": _match_column_synonym(columns, ["bytestransferred", "totalbytestransferred", "bytes", "volume", "datavolumedownlink"]),
+            "app_hint": _match_column_synonym(columns, ["appprotocolhint", "apphint", "application", "protocol", "service", "accesspointname"]),
         }
     else:
         suggested_mapping = {
-            "a_number": _match_column_synonym(columns, ["anumber", "callingnumber", "callermsisdn", "callernumber", "callingparty", "aparty", "srcnum", "caller", "msisdn"]),
-            "b_number": _match_column_synonym(columns, ["bnumber", "callednumber", "calledmsisdn", "calleenumber", "calledparty", "bparty", "dstnum", "callee", "target"]),
+            "a_number": _match_column_synonym(columns, ["targetno", "targetnumber", "callingpartytelephonenumber", "callingparty", "callingnumber", "callermsisdn", "callernumber", "anumber", "aparty", "srcnum", "caller", "msisdn"]),
+            "b_number": _match_column_synonym(columns, ["bpartyno", "bpartynumber", "calledpartytelephonenumber", "calledparty", "callednumber", "calledmsisdn", "calleenumber", "bnumber", "bparty", "dstnum", "callee", "target"]),
             "call_type": _match_column_synonym(columns, ["calltype", "calldirection", "direction", "calldir", "eventtype", "type"]),
-            "start_time": _match_column_synonym(columns, ["starttime", "calldatetime", "datetime", "calltimestamp", "timestamp", "calldt", "calldate"]),
-            "duration_sec": _match_column_synonym(columns, ["durationsec", "calldurationsec", "durationseconds", "duration", "callduration", "secs", "sec"]),
+            "start_time": _match_column_synonym(columns, ["starttime", "calldatetime", "datetime", "calltimestamp", "timestamp", "calldt", "calldate", "date"]),
+            "duration_sec": _match_column_synonym(columns, ["durs", "dursec", "calldurationsec", "durationsec", "durationseconds", "callduration", "duration", "secs", "sec"]),
             "imei": _match_column_synonym(columns, ["imeinum", "imei", "handsetimei", "deviceimei", "imeinumber"]),
             "imsi": _match_column_synonym(columns, ["imsinum", "imsi", "simimsi", "imsinumber"]),
-            "cell_id": _match_column_synonym(columns, ["towercellid", "cellid", "cellsiteid", "firstcgi", "cgi", "towerid", "towercode", "tower"]),
+            "cell_id": _match_column_synonym(columns, ["firstcgi", "firstcellid", "towercellid", "cellid", "cellsiteid", "cgi", "towerid", "towercode", "tower"]),
         }
 
     preview_rows = df.head(3).to_dict(orient="records")
@@ -481,26 +499,44 @@ def ingest_ipdr_data(
 
 
 def seed_towers_from_csv(db: Session, csv_path: str | None = None):
-    if not csv_path:
-        csv_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "towers.csv")
-    if not os.path.exists(csv_path):
+    base_data = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+    paths_to_try = []
+    if csv_path:
+        paths_to_try.append(csv_path)
+    # Prefer comprehensive Rajasthan master towers (66 sites) if available
+    paths_to_try.append(os.path.join(base_data, "rajasthan_cell_towers_master.csv"))
+    paths_to_try.append(os.path.join(base_data, "towers.csv"))
+
+    chosen_path = None
+    for p in paths_to_try:
+        if os.path.exists(p):
+            chosen_path = p
+            break
+    if not chosen_path:
         return
 
-    existing_count = db.query(CellTower).count()
-    if existing_count > 0:
-        return
-
-    df = pd.read_csv(csv_path)
-    towers = []
+    existing_cell_ids = {t[0] for t in db.query(CellTower.cell_id).all()}
+    df = pd.read_csv(chosen_path)
+    new_towers = []
     for _, row in df.iterrows():
-        t = CellTower(
-            cell_id=str(row["cell_id"]).strip(),
-            lac=int(row["lac"]) if pd.notna(row["lac"]) else 0,
-            lat=float(row["lat"]),
-            lon=float(row["lon"]),
-            area_name=str(row["area_name"]).strip()
-        )
-        towers.append(t)
-    if towers:
-        db.bulk_save_objects(towers)
+        cid = str(row["cell_id"]).strip()
+        if cid and cid not in existing_cell_ids:
+            lac_val = 0
+            if pd.notna(row.get("lac")):
+                try:
+                    lac_val = int(float(str(row["lac"]).strip()))
+                except Exception:
+                    lac_val = 0
+            t = CellTower(
+                cell_id=cid,
+                lac=lac_val,
+                lat=float(row["lat"]),
+                lon=float(row["lon"]),
+                area_name=str(row["area_name"]).strip()
+            )
+            new_towers.append(t)
+            existing_cell_ids.add(cid)
+
+    if new_towers:
+        db.bulk_save_objects(new_towers)
         db.commit()
