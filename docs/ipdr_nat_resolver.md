@@ -2,107 +2,62 @@
 
 ## Module Overview
 
-The **IPDR Resolution Engine** (`app/ipdr.py`) resolves one of the toughest challenges in modern cyber crime investigation: **Carrier-Grade NAT (CGNAT) Subscriber De-anonymization**.
+The **IPDR Resolution Engine** (`app/ipdr.py`) solves Carrier-Grade NAT (CGNAT) subscriber de-anonymization across both single forensic lookups and high-volume cyber complaint triaging.
 
-Because IPv4 addresses are scarce, Indian telecom operators route thousands of mobile subscribers simultaneously through a single public IP address using dynamic port translation. A public IP alone is useless in court—investigators must resolve the combination of **Public IP + Public Port + Exact Timestamp** to pinpoint the true subscriber number (MSISDN).
+Because Indian mobile telecom operators route thousands of subscribers simultaneously behind shared public IPv4 gateways using dynamic source-port translation, an IP address alone cannot identify a suspect in court. Investigators must correlate **Public IP + Source Port + Session Window Timestamp** against carrier IPDR logs to attribute activity to a specific subscriber (`subscriber_number`) with full Section 65B lineage.
 
 ---
 
-## Architectural Resolution Workflow
+## Single & Bulk CGNAT Resolution Workflow
 
 ```mermaid
 flowchart TD
-    A["Cyber Crime Lead: Public IP + Source Port + Timestamp"] --> B["IPDR Resolution Engine (match_ipdr_session)"]
-    
-    B --> C["Filter by Case & IP Address Match"]
-    C --> D["Port Number Match (source_port == target_port)"]
-    D --> E["Timestamp Window Verification (start_time ≤ T ≤ end_time ± tolerance)"]
-    
-    E -->|No Match within Tolerance| F["Return Resolution Failure: No Active Session"]
-    E -->|Match Found| G["Extract Subscriber MSISDN & Private IP"]
-    
-    G --> H["Detect Application Signature Hint (Telegram VoIP / WhatsApp / Tor)"]
-    H --> I["Attach Legal Lineage: source_file + source_row"]
-    I --> J["Return Verified Subscriber Identity with Chain-of-Custody"]
+    Lead["Cyber Crime Lead:<br/>Public IP + Source Port + Timestamp"] --> Mode{Resolution Mode}
+
+    Mode -->|Single Lookup| Single["GET /api/cases/{case_id}/ipdr/match<br/>match_ipdr_session(tolerance_minutes=15)"]
+    Mode -->|Bulk 1930 Triage| Batch["POST /api/cases/{case_id}/ipdr/batch<br/>batch_match_ipdr_sessions()"]
+    Mode -->|Quick Sample Test| Sample["GET /api/cases/{case_id}/ipdr/sample<br/>Pulls first real uploaded DB session"]
+
+    Single & Batch --> Query["Filter IPDRRecord on case_id, source_ip & source_port"]
+    Query --> TimeCheck{Session Interval Match}
+
+    TimeCheck -->|Exact Overlap| Exact["match_type: exact_concurrent<br/>(session_start <= T <= session_end)"]
+    TimeCheck -->|Within ±15 Min| Near["match_type: approximate_tolerance_window"]
+    TimeCheck -->|No Port Match| Fallback["match_type: no_match<br/>Return similar_ip_sessions on same IP"]
+
+    Exact & Near --> Out["Extract subscriber_number, app_hint,<br/>bytes_transferred & source_file:source_row"]
 ```
 
 ---
 
-## The CGNAT Dilemma & Solution
+## Core Engine Functions (`app/ipdr.py`)
 
-### The Challenge
-When a cyber criminal executes an unauthorized bank transfer, Telegram extortion call, or dark-web forum post, the victim's web server logs only:
-$$\text{Public IP: } 103.211.54.12, \quad \text{Port: } 44321, \quad \text{Timestamp: } 2026-11-20\ 18:25:10$$
-Querying the ISP with only the IP `103.211.54.12` returns hundreds of potential users.
+### 1. Triple-Key NAT Match (`match_ipdr_session`)
+Accepts `(case_id, ip, port, query_timestamp, db, tolerance_minutes=15)`:
+- Normalizes ISO timestamps (`YYYY-MM-DDTHH:MM:SS` or space-separated variants).
+- Queries `IPDRRecord` rows filtered by `case_id`, `source_ip`, and `source_port`.
+- Classifies hits into:
+  - `exact_concurrent`: Target timestamp falls strictly between `session_start` and `session_end`.
+  - `approximate_tolerance_window`: Nearest edge is within `tolerance_minutes * 60` seconds (default ±15 minutes to handle NTP/bank clock skew).
+  - Fallback diagnostic: On mismatch, queries up to 5 sessions sharing `source_ip` (`similar_ip_sessions`) to assist investigators when logs contain off-by-one ports.
+- Returns `match_found`, `match_type`, `primary_subscriber`, `session`, `sessions`, and `confidence_note`.
 
-### The Resolution Algorithm
-The `match_ipdr_session` engine executes a triple-key lookup with time-drift compensation:
+### 2. Bulk CGNAT Triage (`batch_match_ipdr_sessions`)
+Exposed via `POST /api/cases/{case_id}/ipdr/batch` for **1930 Cyber Helpline** complaints and bulk bank transaction logs:
+- Accepts JSON `{ "queries": [{"ip": "...", "port": ..., "timestamp": "...", "query_id": "..."}], "tolerance_minutes": 15 }`.
+- Evaluates each tuple sequentially, skips malformed inputs cleanly (`invalid_input`), and returns aggregated counts (`total_queries`, `matched_count`, `unmatched_count`, `identified_subscribers_count`, `identified_subscribers`) alongside per-query results.
 
-```python
-def match_ipdr_session(
-    case_id: str,
-    ip: str,
-    port: int,
-    timestamp_str: str,
-    db: Session,
-    tolerance_seconds: int = 300
-):
-    target_dt = parse_iso_or_standard_datetime(timestamp_str)
-    
-    # Query candidate IPDR sessions on matching IP & Port
-    candidates = db.query(IPDRRecord).filter(
-        IPDRRecord.case_id == case_id,
-        or_(
-            and_(IPDRRecord.source_ip == ip, IPDRRecord.source_port == port),
-            and_(IPDRRecord.destination_ip == ip, IPDRRecord.destination_port == port)
-        )
-    ).all()
+### 3. Subscriber Session Profiler (`get_subscriber_ipdr_summary`)
+Exposed via `GET /api/cases/{case_id}/ipdr/subscriber?subscriber=...`:
+- Matches both 10-digit MSISDNs and `+91` prefixed subscriber records.
+- Summarizes `total_sessions`, `total_bytes_transferred`, `app_breakdown` histogram (`App Protocol Hint` / unclassified traffic), and up to 50 chronological session records with `source_file:source_row` citations.
 
-    for rec in candidates:
-        start = parse_iso_or_standard_datetime(rec.session_start)
-        end = parse_iso_or_standard_datetime(rec.session_end)
-        
-        # Verify if target timestamp falls within session window (with tolerance)
-        if (start - timedelta(seconds=tolerance_seconds)) <= target_dt <= (end + timedelta(seconds=tolerance_seconds)):
-            return {
-                "matched": True,
-                "subscriber_number": rec.subscriber_number,
-                "private_ip": rec.source_ip,
-                "session_start": rec.session_start,
-                "session_end": rec.session_end,
-                "bytes_transferred": rec.bytes_transferred,
-                "app_hint": rec.app_hint,
-                "evidence": f"{rec.source_file}:Row {rec.source_row}"
-            }
-```
+### 4. Dynamic Quick-Test Helper (`GET /api/cases/{case_id}/ipdr/sample`)
+Eliminates hardcoded demo IP placeholders in the UI by querying the first uploaded `IPDRRecord` in the active case (`source_ip`, `source_port`, `session_start`, `subscriber`) for one-click verification testing.
 
 ---
 
-## Application Protocol Fingerprinting
+## Supported 24-Field DoT / CGNAT IPDR Schema (`sample_data/sample_ipdr_comprehensive.csv`)
 
-The engine inspects packet sizes, port allocations, and destination endpoint patterns to identify application signatures:
-
-| Protocol / App Signature | Port / Pattern | Forensic Significance |
-| :--- | :--- | :--- |
-| **Telegram (Encrypted VoIP)** | Dynamic UDP / Port range with packet size heuristics | Voice calls between syndicate conspirators |
-| **WhatsApp Media / Call** | Standard STUN/TURN & media IP ranges | File transfer or encrypted chat sessions |
-| **Signal Messenger** | TLS port 443 over dedicated Signal endpoints | Secure operational comms |
-| **Tor / Onion Proxy** | Known directory server IPs & uniform cell sizes | Anonymized network browsing |
-| **Banking / Payment Gateway** | HTTPS 443 to certified financial domains | Fraudulent fund transfers |
-
----
-
-## Subscriber IPDR Profiling (`get_subscriber_ipdr_summary`)
-
-In addition to point lookups, the engine can summarize all Internet sessions for a target suspect:
-- Cumulative data volume (Megabytes / Gigabytes transferred).
-- Peak session hours (day vs. night data usage).
-- Breakdown of accessed applications and destinations.
-- Identification of secondary VoIP calling apps used to bypass standard cellular CDR logging.
-
----
-
-## Module Cross-References
-
-- IPDR matches link to CDR call profiles in **[Forensic Analytics](forensic_analytics.md)**.
-- Natural language IPDR queries are handled by **[AI Investigation Assistant](ai_assistant.md)**.
+The comprehensive IPDR schema captures:
+`Subscriber MSISDN`, `Source IP`, `Source Port`, `Translated IP`, `Translated Port`, `Destination IP`, `Destination Port`, `Protocol`, `Session Start Time`, `Session End Time`, `Session Duration`, `Data Volume Up Link`, `Data Volume Down Link`, `Total Bytes Transferred`, `Access Point Name`, `App Protocol Hint`, `Application`, `IMEI`, `IMSI`, `First Cell ID`, `Last Cell ID`, `Tower Address`, `Roaming Circle`, and `PGW IP Address`.
