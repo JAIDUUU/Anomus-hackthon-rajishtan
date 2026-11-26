@@ -34,11 +34,13 @@ from app.analysis import (
     get_missing_dates_analysis, get_movement_and_cell_changes,
     get_service_and_company_numbers, get_international_intelligence,
     get_imei_summary_list, get_imsi_summary_list, global_search,
-    calculate_suspect_threat_scores, get_temporal_heatmap_24x7
+    calculate_suspect_threat_scores, get_temporal_heatmap_24x7,
+    get_suspect_workspace_summary, get_tower_sector_cones, get_velocity_anomalies,
+    _resolve_tower
 )
 from app.ipdr import match_ipdr_session, get_subscriber_ipdr_summary, batch_match_ipdr_sessions
 from app.assistant import run_ai_assistant
-from app.reports import generate_pdf_report, generate_excel_report
+from app.reports import generate_pdf_report, generate_excel_report, generate_kml_report, generate_kmz_report
 
 app = FastAPI(
     title="Rajasthan Police CDR/IPDR Analysis Tool & AI Assistant",
@@ -79,6 +81,10 @@ class CreateCaseRequest(BaseModel):
     id: str
     title: str
     description: str = ""
+    case_type: str = "Cyber / Telecom"
+    police_station: str = ""
+    investigator_name: str = ""
+    status: str = "ACTIVE"
 
 
 class AIQueryRequest(BaseModel):
@@ -148,11 +154,19 @@ def list_cases(
     cases = db.query(Case).order_by(Case.created_at.desc()).all()
     results = []
     for c in cases:
+        brief = {}
+        try:
+            brief = json.loads(c.brief_data) if c.brief_data else {}
+        except Exception:
+            brief = {}
         results.append({
             "id": c.id,
             "title": c.title,
             "description": c.description,
             "status": c.status,
+            "case_type": brief.get("case_type", "Cyber / Telecom"),
+            "police_station": brief.get("police_station", "State Cyber Cell"),
+            "investigator_name": brief.get("investigator_name", c.created_by),
             "created_by": c.created_by,
             "created_at": c.created_at.isoformat() if c.created_at else None,
             "cdr_count": db.query(CDRRecord).filter(CDRRecord.case_id == c.id).count(),
@@ -172,18 +186,26 @@ def create_case(
     if existing:
         raise HTTPException(status_code=400, detail=f"Case with ID '{req.id}' already exists")
 
+    brief_payload = {
+        "case_type": req.case_type or "Cyber / Telecom",
+        "police_station": req.police_station or "State Cyber Cell",
+        "investigator_name": req.investigator_name or current_user.full_name,
+        "suspects": []
+    }
     new_case = Case(
         id=req.id,
         title=req.title,
         description=req.description,
-        created_by=current_user.username
+        status=(req.status or "ACTIVE").upper(),
+        created_by=current_user.username,
+        brief_data=json.dumps(brief_payload)
     )
     db.add(new_case)
     db.commit()
 
     log_audit_event(
         db, action="CREATE_CASE",
-        details={"case_id": req.id, "title": req.title},
+        details={"case_id": req.id, "title": req.title, "case_type": req.case_type},
         user=current_user, request=request
     )
     return {"message": "Case created successfully", "case_id": req.id}
@@ -653,11 +675,12 @@ def get_evidence_record(
     }
 
 
-# ----------------- FEATURE 8: REPORTS -----------------
+# ----------------- FEATURE 8: REPORTS & GIS EXPORTS -----------------
 @app.get("/api/cases/{case_id}/report")
 def download_report(
     case_id: str,
-    format: str = Query("pdf", pattern="^(pdf|xlsx)$"),
+    format: str = Query("pdf", pattern="^(pdf|xlsx|kml|kmz)$"),
+    suspect: str | None = Query(None, description="Optional suspect filter for spatial exports"),
     request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("investigating_officer", "senior_officer"))
@@ -668,7 +691,7 @@ def download_report(
 
     log_audit_event(
         db, action="REPORT_DOWNLOAD",
-        details={"case_id": case_id, "format": format},
+        details={"case_id": case_id, "format": format, "suspect": suspect},
         user=current_user, request=request
     )
 
@@ -681,13 +704,104 @@ def download_report(
             media_type="application/pdf",
             headers={"Content-Disposition": f"attachment; filename={filename_prefix}.pdf"}
         )
-    else:
+    elif format == "xlsx":
         buf = generate_excel_report(case_id, db)
         return StreamingResponse(
             buf,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={"Content-Disposition": f"attachment; filename={filename_prefix}.xlsx"}
         )
+    elif format == "kml":
+        buf = generate_kml_report(case_id, db, suspect_phone=suspect)
+        return StreamingResponse(
+            buf,
+            media_type="application/vnd.google-earth.kml+xml",
+            headers={"Content-Disposition": f"attachment; filename={filename_prefix}.kml"}
+        )
+    else:  # kmz
+        buf = generate_kmz_report(case_id, db, suspect_phone=suspect)
+        return StreamingResponse(
+            buf,
+            media_type="application/vnd.google-earth.kmz",
+            headers={"Content-Disposition": f"attachment; filename={filename_prefix}.kmz"}
+        )
+
+
+# ----------------- SUSPECT WORKSPACE SUMMARY (IMAGE 3) -----------------
+@app.get("/api/cases/{case_id}/suspect/{phone}/summary")
+def get_suspect_summary_endpoint(
+    case_id: str,
+    phone: str,
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("investigating_officer", "senior_officer", "admin"))
+):
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return get_suspect_workspace_summary(case_id, phone, db)
+
+
+# ----------------- TOWER SECTOR CONES (MAP TYPE 4) -----------------
+@app.get("/api/cases/{case_id}/towers/sectors")
+def get_tower_sectors_endpoint(
+    case_id: str,
+    suspect: str | None = Query(None),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("investigating_officer", "senior_officer", "admin"))
+):
+    return get_tower_sector_cones(case_id, db, suspect_phone=suspect)
+
+
+# ----------------- VELOCITY & IMPOSSIBLE TRAVEL ANOMALIES -----------------
+@app.get("/api/cases/{case_id}/velocity-anomalies")
+def get_velocity_anomalies_endpoint(
+    case_id: str,
+    suspect: str | None = Query(None),
+    max_speed: float = Query(120.0),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("investigating_officer", "senior_officer", "admin"))
+):
+    return get_velocity_anomalies(case_id, db, suspect_phone=suspect, max_speed_kmh=max_speed)
+
+
+# ----------------- GLOBAL / CASE ENTITY LOOKUP -----------------
+@app.get("/api/lookup")
+def entity_lookup_endpoint(
+    q: str = Query(..., min_length=2),
+    case_id: str | None = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("investigating_officer", "senior_officer", "admin"))
+):
+    from app.analysis import lookup_entity_profile
+    return lookup_entity_profile(q, case_id, db)
+
+
+class UpdateCaseStatusRequest(BaseModel):
+    status: str
+
+
+@app.patch("/api/cases/{case_id}/status")
+def update_case_status(
+    case_id: str,
+    req: UpdateCaseStatusRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("investigating_officer", "senior_officer", "admin"))
+):
+    c = db.query(Case).filter(Case.id == case_id).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Case not found")
+    c.status = req.status.upper()
+    db.commit()
+    log_audit_event(
+        db, action="UPDATE_CASE_STATUS",
+        details={"case_id": case_id, "status": c.status},
+        user=current_user, request=request
+    )
+    return {"case_id": case_id, "status": c.status}
 
 
 # ----------------- TAC LOOKUP -----------------
@@ -1037,7 +1151,7 @@ def get_case_analytics(
         imei = r.imei
         imsi = r.imsi
         cell = r.cell_id
-        t_obj = towers.get(cell)
+        t_obj = _resolve_tower(cell, towers)
         area_name = t_obj.area_name if t_obj else (f"Cell {cell}" if cell else "Unknown")
 
         # date extraction
@@ -1159,7 +1273,7 @@ def get_case_analytics(
             delta_sec = 0
             if dt and prev_dt:
                 delta_sec = max(0, int((dt - prev_dt).total_seconds()))
-            t_obj = towers.get(cell)
+            t_obj = _resolve_tower(cell, towers)
             hop = {
                 "seq": len(movement_hops) + 1,
                 "timestamp": st,
@@ -1228,14 +1342,14 @@ def get_case_analytics(
     night_numbers.sort(key=lambda x: x["night_calls"], reverse=True)
 
     # 4. Day & Night Locations
-    day_locs = [
-        {"cell_id": cid, "area_name": towers[cid].area_name if cid in towers else cid, "visits": cnt, "lat": towers[cid].lat if cid in towers else None, "lon": towers[cid].lon if cid in towers else None}
-        for cid, cnt in sorted(tower_day.items(), key=lambda x: x[1], reverse=True)
-    ]
-    night_locs = [
-        {"cell_id": cid, "area_name": towers[cid].area_name if cid in towers else cid, "visits": cnt, "lat": towers[cid].lat if cid in towers else None, "lon": towers[cid].lon if cid in towers else None}
-        for cid, cnt in sorted(tower_night.items(), key=lambda x: x[1], reverse=True)
-    ]
+    day_locs = []
+    for cid, cnt in sorted(tower_day.items(), key=lambda x: x[1], reverse=True):
+        t_obj = _resolve_tower(cid, towers)
+        day_locs.append({"cell_id": cid, "area_name": t_obj.area_name if t_obj else cid, "visits": cnt, "lat": t_obj.lat if t_obj else None, "lon": t_obj.lon if t_obj else None})
+    night_locs = []
+    for cid, cnt in sorted(tower_night.items(), key=lambda x: x[1], reverse=True):
+        t_obj = _resolve_tower(cid, towers)
+        night_locs.append({"cell_id": cid, "area_name": t_obj.area_name if t_obj else cid, "visits": cnt, "lat": t_obj.lat if t_obj else None, "lon": t_obj.lon if t_obj else None})
 
     # 5. Missing dates (Silence Gaps)
     missing_dates = []
@@ -1342,7 +1456,7 @@ def get_case_analytics(
     total_hits = sum(tm["hits"] for tm in tower_meta.values())
     location_summary = []
     for cid, tm in sorted(tower_meta.items(), key=lambda x: x[1]["hits"], reverse=True):
-        t_obj = towers.get(cid)
+        t_obj = _resolve_tower(cid, towers)
         location_summary.append({
             "cell_id": cid,
             "area_name": t_obj.area_name if t_obj else f"Cell {cid}",
