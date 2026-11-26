@@ -1,199 +1,116 @@
-# REST API Reference Specification
+# Complete REST API Reference (50 API Endpoints)
 
-## API Architecture Overview
+The Rajasthan Police Cyber Forensic Command Center exposes **50 `/api/` RESTful endpoints** (plus `/` SPA entrypoint and `/favicon.ico`) built with **FastAPI**, secured via **JWT Bearer Tokens**, and logged to the SHA-256 hash-chained **AuditLog**.
 
-The **Rajasthan Police CDR/IPDR Analysis Tool** provides a RESTful API built on **FastAPI**. All analytical operations, ingestions, graph generations, and AI assistant dialogues are accessible through documented JSON endpoints.
+- **Interactive Swagger UI:** `http://127.0.0.1:8000/docs`
+- **Authorization Header:** `Authorization: Bearer <access_token>`
 
-- **Base URL**: `http://127.0.0.1:8000`
-- **Interactive Documentation**: Swagger UI is available at `/docs` and ReDoc at `/redoc`.
-- **Default Authentication**: Bearer JWT tokens or role header (`X-Demo-Role`).
-
----
-
-## 1. Authentication & User Profile
-
-### `POST /api/auth/login`
-Authenticates an officer and initializes an audit session.
-- **Request Body**:
-  ```json
-  { "username": "io_sharma", "password": "IO@RajPolice2026" }
-  ```
-- **Response `200 OK`**:
-  ```json
-  {
-    "access_token": "jwt_token_string",
-    "token_type": "bearer",
-    "user": {
-      "username": "io_sharma",
-      "full_name": "Inspector Rajesh Sharma",
-      "role": "investigating_officer",
-      "badge_number": "RJ-IO-4122"
-    }
-  }
-  ```
-
-### `GET /api/auth/me`
-Retrieves the currently authenticated user identity and effective permissions.
+> **Note on Dynamic Ingestion-First Workflow:** Legacy static demo seeders (e.g., `POST /api/cases/demo`) have been removed. All analytics endpoints compute strictly against case data ingested via `POST /api/cases` and `POST /api/cases/{case_id}/upload`.
 
 ---
 
-## 2. Case Management & Demo Loader
+## 1. Authentication & Officer Session (`2 Endpoints`)
 
-### `GET /api/cases`
-Lists all active and archived cases in the system.
-
-### `POST /api/cases`
-Creates a new police case file.
-- **Request Body**:
-  ```json
-  { "id": "CASE-RAJ-2026-0042", "title": "Operation Maru-Drishti", "description": "Cyber crime syndicate analysis" }
-  ```
-
-### `GET /api/cases/{case_id}`
-Returns case details, suspect phone numbers, summary counts of CDR/IPDR records, and batch ingestions.
-
-### `POST /api/cases/demo`
-One-click loader for Hackathon evaluation. Initializes case `CASE-RAJ-2026-0042`, seeds cell towers, and ingests 1,998 CDR records across two operator formats and 312 IPDR sessions.
+| Method | Endpoint | Access Roles | Payload / Parameters | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **`POST`** | `/api/auth/login` | Public | JSON `LoginRequest`: `{ username, password }` | Authenticates credentials (`bcrypt`), logs `LOGIN` or `LOGIN_FAILED`, and returns `{ access_token, token_type, user: { username, role, full_name, badge_number } }` |
+| **`GET`** | `/api/auth/me` | Any Authenticated | Bearer Token | Returns active authenticated officer profile |
 
 ---
 
-## 3. Ingestion & Column Mappings
+## 2. FIR Case Management (`4 Endpoints`)
 
-### `GET /api/mappings`
-Returns all registered operator JSON mapping configurations (`operator_a`, `operator_b`, `ipdr_operator_a`).
-
-### `POST /api/mappings`
-Registers or updates a custom operator column mapping schema.
-
-### `POST /api/cases/{case_id}/upload`
-Uploads raw CSV files for processing.
-- **Form Data**:
-  - `file`: Multipart binary CSV file.
-  - `file_type`: `"CDR"` or `"IPDR"`.
-  - `mapping_name`: Mapping identifier (e.g., `"operator_a"`).
-- **Response**: Ingestion status, total rows, valid rows, and rejected rows count.
-
-### `GET /api/cases/{case_id}/batches`
-Returns history of all uploaded batches for the case with validation summaries.
+| Method | Endpoint | Access Roles | Payload / Parameters | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **`GET`** | `/api/cases` | `investigating_officer`, `senior_officer`, `admin` | — | Lists all registered FIR cases sorted newest-first with CDR/IPDR/observation counts |
+| **`POST`** | `/api/cases` | `investigating_officer`, `senior_officer`, `admin` | JSON `CreateCaseRequest`: `{ id, title, description, case_type, police_station, investigator_name, status }` | Registers a new FIR case, embeds brief metadata JSON, and logs `CASE_CREATED` |
+| **`GET`** | `/api/cases/{case_id}` | `investigating_officer`, `senior_officer`, `admin` | Path: `case_id` | Returns complete FIR dossier, dynamic suspect list, record metrics, and upload batch history |
+| **`PATCH`** | `/api/cases/{case_id}/status` | `investigating_officer`, `senior_officer`, `admin` | JSON `UpdateCaseStatusRequest`: `{ status }` | Updates operational status (e.g. `ACTIVE`, `UNDER REVIEW`, `CLOSED`) and logs `CASE_STATUS_UPDATED` |
 
 ---
 
-## 4. Forensic Telecommunications Analytics
+## 3. Data Ingestion & Header Mappings (`5 Endpoints`)
 
-### `GET /api/cases/{case_id}/patterns`
-Computes communication patterns for a specific suspect.
-- **Query Parameters**: `suspect_number` (string)
-- **Response**: Total calls, total duration, in/out ratio, first/last call, and top contacts.
-
-### `GET /api/cases/{case_id}/common`
-Computes common contacts between two or more targets.
-- **Query Parameters**: `suspects` (comma-separated string, e.g., `9829022222,9829033333`)
-- **Response**: Array of shared numbers, call count per suspect, and direct call indicators.
-
-### `GET /api/cases/{case_id}/towers/timeline`
-Retrieves timestamped cell tower registrations and GPS coordinates.
-- **Query Parameters**: `suspect_number` (string)
-
-### `GET /api/cases/{case_id}/meetings`
-Runs the spatiotemporal co-location algorithm.
-- **Query Parameters**: `window_minutes` (integer, default `30`)
-- **Response**: Confirmed meetings, location addresses, timestamps, participants, and evidence row IDs.
-
-### `GET /api/cases/{case_id}/device-changes`
-Detects hardware and subscriber anomalies.
-- **Response**: Multi-SIM per IMEI and multi-IMEI per SIM tracking arrays.
-
-### `GET /api/cases/{case_id}/network`
-Generates Cytoscape-formatted graph elements.
-- **Query Parameters**: `min_calls` (integer, default `1`)
-- **Response**: `{ "nodes": [...], "edges": [...] }`
+| Method | Endpoint | Access Roles | Payload / Parameters | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **`GET`** | `/api/mappings` | Public | — | Lists all preset telecom operator schemas in `data/mappings/*.json` |
+| **`POST`** | `/api/mappings` | `investigating_officer`, `senior_officer`, `admin` | Form: `mapping_id`, `config_json` | Saves or updates a reusable operator column mapping JSON |
+| **`POST`** | `/api/ingest/inspect` | `investigating_officer`, `senior_officer`, `admin` | Multipart: `file` | Parses headers of `.csv`, `.tsv`, `.txt`, `.xlsx`, or `.xls`, strips LEA preambles, and proposes auto-detected field mappings + sample preview rows |
+| **`POST`** | `/api/cases/{case_id}/upload` | `investigating_officer`, `senior_officer` | Multipart: `file`, `file_type` (`CDR` \| `IPDR`), `mapping_name` (`auto` or preset), `custom_mapping_json` | Normalizes & persists records with `source_file:source_row`, auto-upserts BTS coordinates when present, and saves an `ImportBatch` summary |
+| **`GET`** | `/api/cases/{case_id}/batches` | `investigating_officer`, `senior_officer`, `admin` | Path: `case_id` | Retrieves upload validation receipts and row-level rejection logs |
 
 ---
 
-## 5. Advanced Forensic Suite
+## 4. Dashboard, Suspect Workspace & Forensic Analytics (`18 Endpoints`)
 
-### `GET /api/dashboard/metrics`
-Returns executive KPI statistics across the case (total calls, unique callers, active towers, total duration).
-
-### `GET /api/tac/{imei}`
-Returns handset intelligence (brand, commercial model, generation) for an 8-digit TAC.
-
-### `GET /api/cases/{case_id}/raw-cdr`
-Paginated raw CDR viewer supporting dynamic filters (`search`, `start_date`, `end_date`, `call_type`, `limit`, `offset`).
-
-### `GET /api/cases/{case_id}/mfc`
-Most Frequent Callers breakdown with cumulative talk time.
-
-### `GET /api/cases/{case_id}/day-night`
-Daytime (06:00-22:00) vs. Nocturnal (22:00-06:00) calling volume and percentage breakdown.
-
-### `GET /api/cases/{case_id}/first-last`
-Earliest and latest recorded call events for onboarding and cutoff profiling.
-
-### `GET /api/cases/{case_id}/missing-dates`
-Detects communication blackouts and dormancy gaps in target activity.
-
-### `GET /api/cases/{case_id}/movement`
-Analyzes inter-district tower transitions and physical movement velocity across Rajasthan.
-
-### `GET /api/cases/{case_id}/service-numbers`
-Filters calls to bank OTP lines, helpline 1930, 112 ERSS, and customer care.
-
-### `GET /api/cases/{case_id}/international`
-Isolates cross-border communications with international dialing prefixes.
-
-### `GET /api/cases/{case_id}/imei-summary`
-Lists all physical handset IMEIs registered by a given subscriber number.
-
-### `GET /api/cases/{case_id}/imsi-summary`
-Lists all SIM card IMSIs utilized by a given subscriber number.
-
-### `GET /api/search`
-Global forensic search engine scanning callers, receivers, IMEIs, IMSIs, and towers.
-
-### `GET /api/cases/{case_id}/record/{record_type}/{source_row}`
-Retrieves raw data for a specific source row to fulfill Section 65B judicial verification modals.
+| Method | Endpoint | Access Roles | Parameters | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **`GET`** | `/api/dashboard/metrics` | `IO`, `SP`, `Admin` | Query: `case_id` (optional) | Computes global or case-scoped Executive KPI cards, call/SMS distributions, and activity summaries |
+| **`GET`** | `/api/cases/{case_id}/analytics` | `IO`, `SP`, `Admin` | Path: `case_id` | Master 28-module aggregator returning `suspects`, `threat_scores`, `heatmap_24x7`, `mfc`, `first_last`, `day_night`, `day_calls`, `night_calls`, `day_locations`, `night_locations`, `location_summary`, `location_intelligence`, `missing_dates`, `movement`, `cell_id_changes`, `location_changes`, `interactive_timeline`, `network_stats`, `service_numbers`, `international_numbers`, `imei_summary`, `imsi_summary`, `imei_patterns`, `imsi_patterns`, `notifications`, and `ownership` |
+| **`GET`** | `/api/cases/{case_id}/suspect/{phone}/summary` | `IO`, `SP`, `Admin` | Path: `case_id`, `phone` | Returns 10 Suspect Workspace KPI cards, real ownership matches, operator percentages, and 100 recent CDR rows |
+| **`GET`** | `/api/cases/{case_id}/threat-scoring` | `IO`, `SP`, `Admin` | Path: `case_id` | Computes `0–100` multi-factor Threat Score, risk tier, archetype, and risk factors per suspect |
+| **`GET`** | `/api/cases/{case_id}/heatmap` | `IO`, `SP`, `Admin` | Query: `target_number` (optional) | Generates 7×24 temporal call-intensity matrix |
+| **`GET`** | `/api/cases/{case_id}/raw-cdr` | `IO`, `SP`, `Admin` | Query: `search`, `call_type`, `page` (≥1), `limit` (1–500) | Paginated Section 65B raw CDR explorer with filter support |
+| **`GET`** | `/api/cases/{case_id}/patterns` | `IO`, `SP` | Query: `number` | Call asymmetry, hourly peaks, and top contacts for one number |
+| **`GET`** | `/api/cases/{case_id}/common` | `IO`, `SP` | Query: `numbers` (comma-separated) | Intersects contact sets across 2+ suspect MSISDNs |
+| **`GET`** | `/api/cases/{case_id}/link-analysis` | `IO`, `SP`, `Admin` | Query: `num1`, `num2` | Direct link stats, common contacts, shared cell towers, and chronological interactions between two targets |
+| **`GET`** | `/api/cases/{case_id}/mfc` | `IO`, `SP`, `Admin` | Query: `target_number` (optional), `top` (1–200) | Most Frequent Callers ranking |
+| **`GET`** | `/api/cases/{case_id}/day-night` | `IO`, `SP`, `Admin` | Query: `target_number` (optional) | Day (`06:00–21:59`) vs. Night (`22:00–05:59`) call ratio & high-nocturnal peers |
+| **`GET`** | `/api/cases/{case_id}/first-last` | `IO`, `SP`, `Admin` | Query: `target_number` (optional) | First and last communication timestamps per contact |
+| **`GET`** | `/api/cases/{case_id}/missing-dates` | `IO`, `SP`, `Admin` | Query: `target_number` (optional) | Detects zero-activity dormancy days between first & last CDR event |
+| **`GET`** | `/api/cases/{case_id}/service-numbers` | `IO`, `SP`, `Admin` | Path: `case_id` | Screens interactions against banking IVRs, 1930, 112, and carrier codes |
+| **`GET`** | `/api/cases/{case_id}/international` | `IO`, `SP`, `Admin` | Path: `case_id` | Identifies cross-border `+` / `00` / ISD calls and high-risk corridors |
+| **`GET`** | `/api/cases/{case_id}/imei-summary` | `IO`, `SP`, `Admin` | Path: `case_id` | IMEI device usage counts, linked numbers, and TAC model intelligence |
+| **`GET`** | `/api/cases/{case_id}/imsi-summary` | `IO`, `SP`, `Admin` | Path: `case_id` | IMSI SIM identity counts, carrier MCC/MNC decoding, and IMEI bindings |
+| **`GET`** | `/api/cases/{case_id}/device-changes` | `IO`, `SP` | Path: `case_id` | Flags `1 IMEI -> N SIMs` and `1 SIM -> N IMEIs` swapping behavior |
 
 ---
 
-## 6. Carrier-Grade NAT (CGNAT) IPDR Resolver
+## 5. Geospatial Intelligence & Mobility (`5 Endpoints`)
 
-### `GET /api/cases/{case_id}/ipdr/match`
-De-anonymizes public IP sessions.
-- **Query Parameters**:
-  - `ip`: Public IPv4 address (e.g., `103.211.54.12`)
-  - `port`: Public TCP/UDP port (e.g., `44321`)
-  - `timestamp`: Timestamp string (e.g., `2026-11-20 18:25:10`)
-  - `tolerance_seconds`: Time window tolerance (default `300`)
-- **Response**: Matched subscriber MSISDN, private IP, session duration, and application hint.
-
-### `GET /api/cases/{case_id}/ipdr/subscriber`
-Summarizes all Internet data activity for a target subscriber.
+| Method | Endpoint | Access Roles | Parameters | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **`GET`** | `/api/cases/{case_id}/towers/timeline` | `IO`, `SP` | Query: `number` | Chronological BTS tower hops for a suspect with CGI-aware lat/lon resolution |
+| **`GET`** | `/api/cases/{case_id}/towers/sectors` | `IO`, `SP`, `Admin` | Query: `suspect` (optional) | Generates 65° tri-sector azimuth RF coverage polygons (`1.2 km` radius) for GIS mode 5 |
+| **`GET`** | `/api/cases/{case_id}/movement` | `IO`, `SP`, `Admin` | Query: `target_number` (optional) | Sequential inter-tower movement trail with Haversine distance & speed calculation |
+| **`GET`** | `/api/cases/{case_id}/meetings` | `IO`, `SP` | Query: `num1`, `num2`, `window` (default `30` mins) | Identifies physical BTS co-location meetings between two targets within time delta |
+| **`GET`** | `/api/cases/{case_id}/velocity-anomalies` | `IO`, `SP`, `Admin` | Query: `suspect` (optional), `max_speed` (default `120.0` km/h) | Flags impossible non-flight terrestrial velocities indicating cloned SIMs |
 
 ---
 
-## 7. AI Investigation Assistant & Endorsements
+## 6. Global Intelligence, TAC & Entity Lookup (`4 Endpoints`)
 
-### `POST /api/cases/{case_id}/assistant`
-Submits a natural language query in English, Hindi, or Hinglish.
-- **Request Body**: `{ "query": "S3 ne kab SIM badla?" }`
-- **Response**: Synthesized answer, evidence row citations, suggested follow-ups, and observation ID.
-
-### `GET /api/cases/{case_id}/observations`
-Lists all AI-generated observations with current verification statuses.
-
-### `POST /api/cases/{case_id}/observations/{obs_id}/verify`
-Supervisory officer endpoint to endorse or reject an AI observation.
-- **Request Body**: `{ "action": "verify", "notes": "Verified against raw CDR rows." }`
+| Method | Endpoint | Access Roles | Parameters | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **`GET`** | `/api/tac/{imei}` | `IO`, `SP`, `Admin` | Path: `imei` | Resolves 8-digit IMEI TAC prefix to OEM, commercial model, and cellular band |
+| **`GET`** | `/api/search` | `IO`, `SP`, `Admin` | Query: `q` (min len 1), `case_id` (optional) | Cross-case or scoped full-text search via `global_search` |
+| **`GET`** | `/api/cases/{case_id}/search` | `IO`, `SP`, `Admin` | Query: `q` (min len 1) | Case-local rapid search returning up to 20 CDRs, 20 IPDRs, and 10 matching BTS towers |
+| **`GET`** | `/api/lookup` | `IO`, `SP`, `Admin` | Query: `q` (min len 2), `case_id` (optional) | Detailed entity dossier lookup via `lookup_entity_profile` |
 
 ---
 
-## 8. Judicial Reports & Audit Logs
+## 7. Carrier-Grade NAT (CGNAT) IPDR Resolution (`4 Endpoints`)
 
-### `GET /api/cases/{case_id}/report`
-Generates and downloads formal case reports.
-- **Query Parameters**: `format` (`"pdf"` or `"excel"`)
-- **Response**: Streaming binary attachment (`application/pdf` or `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`).
+| Method | Endpoint | Access Roles | Payload / Parameters | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **`GET`** | `/api/cases/{case_id}/ipdr/match` | `IO`, `SP` | Query: `ip`, `port`, `timestamp` | Triple-key subscriber attribution with ±15 min window tolerance and fallback IP matches |
+| **`GET`** | `/api/cases/{case_id}/ipdr/subscriber` | `IO`, `SP` | Query: `subscriber` | Summarizes IPDR session volume, bytes transferred, and app hint breakdown |
+| **`GET`** | `/api/cases/{case_id}/ipdr/sample` | `IO`, `SP`, `Admin` | Path: `case_id` | Returns first real uploaded IPDR session tuple in DB for one-click verification |
+| **`POST`** | `/api/cases/{case_id}/ipdr/batch` | `IO`, `SP` | JSON `{ queries: [{ ip, port, timestamp, query_id }], tolerance_minutes }` | Bulk CGNAT resolution for 1930 Cyber Helpline & bank fraud complaint batches |
 
-### `GET /api/audit`
-Retrieves the immutable, tamper-evident audit trail records.
+---
+
+## 8. Network Graph, AI Copilot, Evidence, Reports & Audit (`8 Endpoints`)
+
+| Method | Endpoint | Access Roles | Payload / Parameters | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **`GET`** | `/api/cases/{case_id}/network` | `IO`, `SP` | Query: `min_calls` (default `1`) | Generates Cytoscape.js node/edge elements for 4-Quad syndicate topology |
+| **`POST`** | `/api/cases/{case_id}/assistant` | `IO`, `SP` | JSON `AIQueryRequest`: `{ query }` | Invokes LangGraph bilingual AI copilot & saves `AIObservation` (`pending_verification`) |
+| **`GET`** | `/api/cases/{case_id}/observations` | `IO`, `SP`, `Admin` | Path: `case_id` | Lists persisted AI observations alongside SP verification metadata |
+| **`POST`** | `/api/cases/{case_id}/observations/{obs_id}/verify` | **`senior_officer` only** | JSON `ObservationVerifyRequest`: `{ action: "verify" \| "reject", notes }` | Certifies or rejects an AI finding prior to statutory court inclusion |
+| **`GET`** | `/api/cases/{case_id}/record/{record_type}/{source_row}` | `IO`, `SP` | Path: `record_type` (`CDR` \| `IPDR`), `source_row`; Query: `source_file` | Retrieves exact normalized & raw CSV row for Section 65B drawer verification |
+| **`GET`** | `/api/cases/{case_id}/report` | `IO`, `SP` | Query: `format` (`pdf` \| `xlsx` \| `kml` \| `kmz`), `suspect` (optional) | Generates court PDF, 6-sheet Excel workbook, or Google Earth KML/KMZ stream |
+| **`GET`** | `/api/audit` | `senior_officer`, `admin` | Query: `limit` (default `100`), `action` (optional) | Reads hash-chained audit logs (note: Investigating Officers receive `403`) |
+| **`GET`** | `/api/audit/verify` | `IO`, `SP`, `Admin` | — | Re-computes SHA-256 chain from genesis record to verify ledger tamper resistance |
+
+*Additionally, `GET /` serves the Command Center SPA and `GET /favicon.ico` returns HTTP `204`.*
