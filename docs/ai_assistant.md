@@ -2,36 +2,31 @@
 
 ## Module Overview
 
-The **AI Investigation Assistant** (`app/assistant.py`) serves as an autonomous copilot for police investigators. Orchestrated using **LangGraph**, the agent accepts conversational queries in **English, Hindi, and Hinglish**, executes precise backend analytical routines, and formats findings with strict legal safeguards.
+The **AI Investigation Assistant** (`app/assistant.py`) is an agentic copilot orchestrated via **LangGraph** (`StateGraph`). It accepts natural-language queries in **English, Hindi, and Hinglish**, routes intents dynamically against live database evidence for the active FIR case, binds every claim to **Section 65B source citations**, enforces **Section 5(2) Indian Telegraph Act metadata-only guardrails**, and queues every AI observation for **Supervisory Officer verification**.
 
 ---
 
-## Agent State & Decision Flow
+## LangGraph Execution Pipeline (`build_investigation_graph`)
 
 ```mermaid
 flowchart TD
-    UserQuery["User Natural Language Query (English / Hindi / Hinglish)"] --> IntentParser["Intent & Entity Parser (Extract Phones, IPs, Dates, Actions)"]
-    
-    IntentParser --> GuardrailCheck{"Section 5(2) Telegraph Act Guardrail Check"}
-    
-    GuardrailCheck -->|Detected Wiretap / Audio / Content Request| Disallow["Block & Issue Statutory Guardrail Notice: Metadata Only"]
-    
-    GuardrailCheck -->|Legitimate Metadata Query| ToolRouter["Select Forensic Tool (MFC / Common / Trajectory / IPDR / SIM Swap)"]
-    
-    ToolRouter --> ToolExec["Execute Backend Python Analytical Routine"]
-    ToolExec --> EvidenceMapper["Extract & Tag Exact Source Evidence (source_file:row_id)"]
-    EvidenceMapper --> Formatter["Synthesize Structured Findings with Explanations"]
-    
-    Formatter --> ObservationDB["Persist to ai_observations (status: pending_verification)"]
-    ObservationDB --> Supervisor{"Supervisory Officer Review"}
-    
-    Supervisor -->|SP Sangeeta Verma Certifies| Verified["Status: VERIFIED (Included in Statutory Court PDF)"]
-    Supervisor -->|SP Rejects / Requests Revision| Rejected["Status: REJECTED with Officer Comments"]
+    Query["Natural Language Query<br/>(English / Hindi / Hinglish)"] --> Intent["Node 1: intent_node()<br/>Extract Phone/IP/Port & Route Intent"]
+    Intent --> Guardrail["Node 2: guardrail_node()<br/>Section 5(2) Indian Telegraph Act Check"]
+
+    Guardrail -->|Intercept / Audio / Msg Content| Block["Set is_supported = False<br/>Metadata-Only Refusal Notice"]
+    Guardrail -->|Permitted Metadata Query| Tool["Node 3: tool_execution_node()<br/>Run Backend Forensic Function"]
+
+    Tool & Block --> Builder["Node 4: evidence_and_answer_node()<br/>Format Answer, Evidence Rows & Follow-Ups"]
+    Builder --> Persist["Save AIObservation to SQLite<br/>(status = 'pending_verification')"]
+    Persist --> SP{"SP Sangeeta Verma Review<br/>(/observations/{obs_id}/verify)"}
+
+    SP -->|verify| Verified["VERIFIED (Judicial Ready PDF / XLSX)"]
+    SP -->|reject| Rejected["REJECTED with Officer Notes"]
 ```
 
 ---
 
-## Agent State Definition (`AgentState`)
+## Agent State Schema (`AgentState`)
 
 ```python
 class AgentState(TypedDict):
@@ -54,68 +49,26 @@ class AgentState(TypedDict):
 
 ---
 
-## Statutory Guardrails (Section 5(2), Indian Telegraph Act)
+## Supported Intents & Bilingual NLP Routing (`detect_intent_rule_based`)
 
-Under Indian law, telecom service providers furnish metadata (CDR and IPDR) to law enforcement agencies for investigative correlation. Lawful interception of call content or audio recordings is strictly governed under Section 5(2) of the Indian Telegraph Act, requiring Home Department sanctions, and is never bundled in standard CDR feeds.
+Using regex entity extractors (`extract_phone_numbers` for 10-digit Indian MSISDNs and `extract_ip_and_port` for IPv4/port tuples), the router dispatches multilingual officer queries to verified Python backend routines:
 
-### The Guardrail Filter
-When a user attempts to query call contents:
-- *"Call me kya baat hui recording sunao"*
-- *"Show me the WhatsApp message text"*
-- *"Listen to the wiretap audio"*
-
-The assistant triggers an automated refusal explaining:
-> ⚠️ **Statutory Disclaimer (Section 5(2) Indian Telegraph Act)**:
-> This system processes telecom transmission **metadata only** (caller, receiver, timestamp, duration, cell location, IP sessions). Voice audio recordings and message contents are not stored or accessible in CDR/IPDR feeds. Speculative content deduction is legally restricted.
-
----
-
-## Bilingual NLP Support (English / Hindi / Hinglish)
-
-Police officers in Rajasthan frequently interact in Hindi or Hinglish. The assistant seamlessly parses multilingual questions:
-
-| Query Type | Query Example | Interpreted Intent | Executed Function |
+| Interpreted Intent | Sample Bilingual Keywords | Executed Backend Function | Dynamic Context Fallback |
 | :--- | :--- | :--- | :--- |
-| **English** | *"Who are the top frequent contacts of S1 9829022222?"* | `get_top_contacts` | `analyze_communication_patterns` |
-| **Hinglish** | *"S3 9829044444 ne kab SIM badla ya IMEI reuse kiya?"* | `detect_imei_swap` | `detect_imei_sim_changes` |
-| **Hindi** | *"Kaun kaun se suspects MI Road tower par mile the?"* | `detect_meetings` | `detect_meetings` |
-| **English** | *"Resolve IP 103.211.54.12 on port 44321 at 18:25:10"* | `resolve_ipdr` | `match_ipdr_session` |
-| **Hinglish** | *"Donon suspects S1 aur S2 ke beech common numbers kaun se hain?"* | `find_common_contacts` | `find_common_numbers` |
+| **`unsupported`** | `"recording"`, `"sunao"`, `"kya baat hui"`, `"call content"`, `"live location"`, `"whatsapp message content"` | `guardrail_unsupported` | Enforces Section 5(2) statutory boundary |
+| **`ipdr_lookup`** | IPv4 pattern or `"ipdr"`, `"ip address"`, `"public ip"` | `match_ipdr_session` | If IP/timestamp omitted, dynamically pulls active case's uploaded `IPDRRecord` session |
+| **`meeting_detection`** | `"meeting"`, `"mile the"`, `"kahan mile"`, `"same tower"`, `"rendezvous"` | `detect_meetings` | Uses extracted 2 numbers or top 2 suspects from `get_ordered_suspects_for_case` |
+| **`imei_sim_changes`** | `"sim swap"`, `"imei change"`, `"handset badla"`, `"sim badla"` | `detect_imei_sim_changes` | Evaluates case-wide multi-SIM / multi-IMEI swaps |
+| **`common_numbers`** | `"common"`, `"mutual"`, `"dono se baat"`, `"shared contact"` | `find_common_numbers` | Intersects suspect pair contact networks |
+| **`night_activity`** | `"night"`, `"raat"`, `"der raat"`, `"odd hours"` | `analyze_communication_patterns` | Profiles nocturnal call ratio (`22:00–05:59`) |
+| **`location_timeline`** | `"tower"`, `"location"`, `"kahan gaya"`, `"route"`, `"path"` | `get_location_timeline` | Extracts chronological BTS movement history |
+| **`frequent_contacts`** | `"frequent"`, `"top contact"`, `"sabse jyada"`, `"most called"` | `analyze_communication_patterns` | Ranks top peers, talk time, and asymmetry |
+| **`explain_view`** | `"explain"`, `"chart"`, `"graph"`, `"samjhao"` | `case_overview` | Summarizes uploaded case overview |
 
 ---
 
-## Section 65B Source Evidence Citation
+## Mandatory Statutory Controls
 
-AI hallucinations or unsubstantiated claims are fatal in judicial proceedings. The copilot binds every observation to physical evidence records:
-
-```json
-{
-  "evidence": [
-    {
-      "type": "CDR",
-      "source_file": "cdr_operator_A.csv",
-      "source_row": 42,
-      "details": "Caller: 9829022222 -> Receiver: 9829011111 on 2026-11-18 14:22:10 (Duration: 340s)"
-    }
-  ]
-}
-```
-
-In the user interface, investigators can click any evidence badge (`cdr_operator_A:Row 42`) to open the **Source Evidence Modal**, verifying the exact raw telecom record.
-
----
-
-## Dual-Officer Verification Workflow
-
-1. **Investigating Officer (IO Sharma)** asks a question $\rightarrow$ Observation generated with status `pending_verification`.
-2. **Supervisory Officer (SP Sangeeta Verma)** reviews the findings and evidence links.
-3. SP clicks **"Verify & Endorse"** with statutory remarks $\rightarrow$ Status changes to `verified`.
-4. Only verified observations are certified and printed in the formal court-admissible PDF report.
-
----
-
-## Module Cross-References
-
-- Underlying analytics are detailed in **[Forensic Analytics](forensic_analytics.md)**.
-- Supervisory actions are recorded in **[Security & Audit Chain](security_audit_chain.md)**.
-- Verified observations are published by the **[Reporting Engine](reporting_engine.md)**.
+1. **Section 5(2) Indian Telegraph Act Metadata Guardrail:** Requests seeking spoken call audio, SMS/WhatsApp message body text, or live GPS interception immediately trigger `is_supported = False` and explain that CDR/IPDR records strictly store transmission metadata.
+2. **Zero-Hallucination Section 65B Lineage:** Every observation persists JSON-serialized source pointers (`source_file`, `source_row`) from matching DB records into `ai_observations`.
+3. **Human-in-the-Loop Supervisory Gate:** Observations default to `"pending_verification"` (`confidence_note: "AI observation - officer verification pending"`) until a Senior Officer (`require_role("senior_officer")`) submits `"verify"` or `"reject"` via `POST /api/cases/{case_id}/observations/{obs_id}/verify`.
