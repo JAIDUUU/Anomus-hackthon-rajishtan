@@ -13,6 +13,16 @@ let leafletLayerGroup = null;
 let dashDistChart = null;
 let mfcChartInstance = null;
 let dayNightChartInstance = null;
+let chartTimelineInstance = null;
+let chartHourlyInstance = null;
+let chartCallTypeInstance = null;
+let chartDurationInstance = null;
+
+// Suspect workspace state
+let currentSuspectPhone = "";
+let activeMapMode = "towers";
+let sectorConesLayer = null;
+let meetingBuffersLayer = null;
 
 // Pagination state for Raw CDR
 let cdrCurrentPage = 1;
@@ -43,8 +53,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 function initTheme() {
   const saved = localStorage.getItem("forensic-theme") || "dark";
   document.documentElement.setAttribute("data-theme", saved);
-  const btn = document.getElementById("btn-theme-toggle");
-  if (btn) btn.innerText = saved === "light" ? "🌙" : "☀️";
 }
 
 function toggleTheme() {
@@ -52,30 +60,75 @@ function toggleTheme() {
   const next = current === "dark" ? "light" : "dark";
   document.documentElement.setAttribute("data-theme", next);
   localStorage.setItem("forensic-theme", next);
-  const btn = document.getElementById("btn-theme-toggle");
-  if (btn) btn.innerText = next === "light" ? "🌙" : "☀️";
 }
 
-// ----------------- REAL-TIME LIVE TICKING CLOCK (IST) -----------------
+function toggleRolePopover(e) {
+  if (e) e.stopPropagation();
+  const pop = document.getElementById("role-popover");
+  if (pop) pop.classList.toggle("open");
+}
+
+function closeRolePopover() {
+  const pop = document.getElementById("role-popover");
+  if (pop) pop.classList.remove("open");
+}
+
+document.addEventListener("click", () => closeRolePopover());
+
+// ----------------- DUAL SIDEBAR CONTEXT & COLLAPSE -----------------
+let sidebarContext = "home"; // "home" (Image 1) | "investigation" (Images 3/4/modules)
+
+function switchSidebarContext(ctx) {
+  sidebarContext = ctx;
+  const homeMenu = document.getElementById("sidebar-home-menu");
+  const invMenu = document.getElementById("sidebar-investigation-menu");
+  if (ctx === "investigation") {
+    if (homeMenu) homeMenu.style.display = "none";
+    if (invMenu) invMenu.style.display = "flex";
+  } else {
+    if (homeMenu) homeMenu.style.display = "block";
+    if (invMenu) invMenu.style.display = "none";
+  }
+}
+
+function toggleSidebarContext() {
+  switchSidebarContext(sidebarContext === "home" ? "investigation" : "home");
+}
+
+function toggleSidebarCollapsed() {
+  const sb = document.getElementById("app-sidebar");
+  if (sb) sb.classList.toggle("collapsed");
+}
+
+function enterInvestigationWorkspace(targetView = "advanced-cdr") {
+  switchSidebarContext("investigation");
+  switchView(targetView);
+}
+
+// ----------------- REAL-TIME LIVE TICKING CLOCK -----------------
 function startLiveClock() {
   function updateClock() {
     const now = new Date();
-    // Offset for Indian Standard Time (UTC +5:30)
     const istOffset = 5.5 * 60 * 60 * 1000;
     const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
     const istDate = new Date(utc + istOffset);
 
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const dd = String(istDate.getDate()).padStart(2, "0");
+    const dayName = days[istDate.getDay()];
     const mmm = months[istDate.getMonth()];
-    const yyyy = istDate.getFullYear();
-    const hh = String(istDate.getHours()).padStart(2, "0");
+    const dd = istDate.getDate();
+
+    let h = istDate.getHours();
+    const ampm = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    const hh = String(h).padStart(2, "0");
     const mm = String(istDate.getMinutes()).padStart(2, "0");
     const ss = String(istDate.getSeconds()).padStart(2, "0");
 
     const clockEl = document.getElementById("live-clock-display");
     if (clockEl) {
-      clockEl.innerText = `${dd}-${mmm}-${yyyy} ${hh}:${mm}:${ss} IST`;
+      clockEl.innerText = `${dayName}, ${mmm} ${dd}  ${hh}:${mm}:${ss} ${ampm}`;
     }
   }
   updateClock();
@@ -146,22 +199,22 @@ function updateUserUI() {
   if (!currentUser) return;
   const nameEl = document.getElementById("header-user-name");
   const roleEl = document.getElementById("header-user-role");
-  const badgeWrap = document.getElementById("user-profile-badge");
+  const auditBtn = document.getElementById("audit-nav-btn");
 
   if (nameEl) nameEl.innerText = currentUser.full_name;
   if (roleEl) {
     if (currentUser.role === "admin") {
       roleEl.innerText = "ACP Meena (Admin)";
       roleEl.className = "role-tag role-admin";
-      document.getElementById("audit-nav-btn").style.display = "flex";
+      if (auditBtn) auditBtn.style.display = "flex";
     } else if (currentUser.role === "senior_officer") {
       roleEl.innerText = "SP Verma (Senior)";
       roleEl.className = "role-tag role-senior";
-      document.getElementById("audit-nav-btn").style.display = "flex";
+      if (auditBtn) auditBtn.style.display = "flex";
     } else {
       roleEl.innerText = "IO Sharma (Analyst)";
       roleEl.className = "role-tag role-io";
-      document.getElementById("audit-nav-btn").style.display = "none";
+      if (auditBtn) auditBtn.style.display = "none";
     }
   }
 
@@ -208,35 +261,36 @@ async function loadCasesList() {
     if (!res.ok) return;
     const cases = await res.json();
     const selector = document.getElementById("case-selector");
-    selector.innerHTML = "";
+    if (selector) selector.innerHTML = "";
 
     if (cases.length === 0) {
       currentCaseId = "";
       currentCaseHasData = false;
-      selector.innerHTML = `<option value="">-- No Cases Registered --</option>`;
-      document.getElementById("stat-hdr-cdr").innerText = "0";
-      document.getElementById("stat-hdr-ipdr").innerText = "0";
-      document.getElementById("stat-hdr-suspects").innerText = "0";
-      document.getElementById("badge-cdr-count").innerText = "0";
-      const gateMsg = document.getElementById("ingestion-gate-msg");
-      if (gateMsg) {
-        gateMsg.innerText = "Step 1: Click '+ Register FIR Case' -> Step 2: Upload CDR/IPDR files in 2 formats (CSV / Excel) -> Step 3: Analytics unlock automatically.";
-      }
-      switchView("import");
+      if (selector) selector.innerHTML = `<option value="">-- No Cases Registered --</option>`;
+      const sHdrCdr = document.getElementById("stat-hdr-cdr");
+      if (sHdrCdr) sHdrCdr.innerText = "0";
+      const sHdrIpdr = document.getElementById("stat-hdr-ipdr");
+      if (sHdrIpdr) sHdrIpdr.innerText = "0";
+      const sHdrSus = document.getElementById("stat-hdr-suspects");
+      if (sHdrSus) sHdrSus.innerText = "0";
       return;
     }
 
     cases.forEach(c => {
-      const opt = document.createElement("option");
-      opt.value = c.id;
-      opt.textContent = `${c.id} - ${c.title}`;
-      selector.appendChild(opt);
+      if (selector) {
+        const opt = document.createElement("option");
+        opt.value = c.id;
+        opt.textContent = `${c.id} — ${c.title}`;
+        selector.appendChild(opt);
+      }
     });
 
-    if (!currentCaseId && cases.length > 0) {
-      currentCaseId = cases[0].id;
+    if (!currentCaseId || !cases.some(c => c.id === currentCaseId)) {
+      // Pick first case with CDRs uploaded, else latest case
+      const withData = cases.find(c => (c.cdr_count || 0) + (c.ipdr_count || 0) > 0);
+      currentCaseId = withData ? withData.id : cases[0].id;
     }
-    selector.value = currentCaseId;
+    if (selector) selector.value = currentCaseId;
     await onCaseSelected(currentCaseId);
   } catch (err) {
     console.error("Error loading cases:", err);
@@ -258,18 +312,16 @@ async function onCaseSelected(caseId) {
   await loadExecutiveMetrics(caseId);
   await loadCaseDetails(caseId);
 
-  if (!currentCaseHasData) {
+  if (currentCaseHasData) {
+    await getCaseAnalytics();
+  } else {
     const gateMsg = document.getElementById("ingestion-gate-msg");
     if (gateMsg) {
-      gateMsg.innerText = `Active Case '${caseId}' has 0 records. Upload CDR & IPDR files in 2 formats (CSV / Excel) below to unlock analytics.`;
+      gateMsg.innerText = `Case '${caseId}' has 0 records. Upload CDR / IPDR CSV or Excel files below to populate analytics.`;
     }
-    switchView("import");
-    return;
   }
 
-  await getCaseAnalytics();
-
-  // Refresh whatever active view is open
+  // Refresh active view cleanly
   const activeView = document.querySelector(".module-view.active");
   if (activeView) {
     const viewId = activeView.id.replace("view-", "");
@@ -290,16 +342,23 @@ async function loadCaseDetails(caseId) {
     currentCaseHasData = (cdrCnt + ipdrCnt) > 0;
 
     // Update Header Stats
-    document.getElementById("stat-hdr-cdr").innerText = cdrCnt;
-    document.getElementById("stat-hdr-ipdr").innerText = ipdrCnt;
+    const sHdrCdr = document.getElementById("stat-hdr-cdr");
+    if (sHdrCdr) sHdrCdr.innerText = cdrCnt;
+    const sHdrIpdr = document.getElementById("stat-hdr-ipdr");
+    if (sHdrIpdr) sHdrIpdr.innerText = ipdrCnt;
     const suspects = (data.brief_data && data.brief_data.suspects) ? data.brief_data.suspects : [];
-    document.getElementById("stat-hdr-suspects").innerText = suspects.length;
-    document.getElementById("badge-cdr-count").innerText = cdrCnt;
+    const sHdrSus = document.getElementById("stat-hdr-suspects");
+    if (sHdrSus) sHdrSus.innerText = suspects.length;
+    const bCdrCnt = document.getElementById("badge-cdr-count");
+    if (bCdrCnt) bCdrCnt.innerText = cdrCnt;
 
     // Update Dashboard Brief
-    document.getElementById("dash-case-title").innerText = `${data.id}: ${data.title}`;
-    document.getElementById("dash-case-desc").innerText = data.description || "No narrative brief provided.";
-    document.getElementById("dash-case-status").innerText = data.status || "ACTIVE";
+    const dashTitle = document.getElementById("dash-case-title");
+    if (dashTitle) dashTitle.innerText = `${data.id}: ${data.title}`;
+    const dashDesc = document.getElementById("dash-case-desc");
+    if (dashDesc) dashDesc.innerText = data.description || "No narrative brief provided.";
+    const dashStatus = document.getElementById("dash-case-status");
+    if (dashStatus) dashStatus.innerText = data.status || "ACTIVE";
 
     // Suspect Chips
     const chipsBox = document.getElementById("dash-suspects-chips");
@@ -462,14 +521,18 @@ function renderWorkbenchSubnav(wbId, activeViewId) {
 }
 
 // ----------------- SIDEBAR & VIEW SWITCHER -----------------
+const INVESTIGATION_ONLY_VIEWS = new Set([
+  "advanced-cdr", "graph", "raw-cdr", "mfc", "network-analysis", "international",
+  "service-numbers", "imei-summary", "imsi-summary", "imei-patterns", "imsi-patterns",
+  "first-last", "location-summary", "location-intelligence", "day-locations", "day-calls",
+  "night-locations", "night-calls", "movement", "cell-id-changes", "location-changes",
+  "missing-dates", "interactive-timeline", "link-analysis", "geo-map", "ipdr", "batch-ipdr",
+  "device-changes", "meetings"
+]);
+
 function switchView(viewName, updateWorkbench = true) {
-  // Enforce ingestion-first gate: analytics require uploaded data
-  if (!currentCaseHasData && viewName !== "import" && viewName !== "audit") {
-    viewName = "import";
-    const gateMsg = document.getElementById("ingestion-gate-msg");
-    if (gateMsg) {
-      gateMsg.innerHTML = `<span style="color:#fbbf24;">⚠️ Pehle format files (CSV / Excel CDR &amp; IPDR) upload karein — uske baad hi forensic analytics unlock honge!</span>`;
-    }
+  if (INVESTIGATION_ONLY_VIEWS.has(viewName) && sidebarContext !== "investigation") {
+    switchSidebarContext("investigation");
   }
 
   if (updateWorkbench) {
@@ -498,24 +561,57 @@ function switchView(viewName, updateWorkbench = true) {
     viewEl.classList.add("active");
   }
 
+  // Highlight active item across both home & investigation sidebars cleanly
+  const homeIdMap = {
+    "dashboard": "home-btn-dashboard",
+    "cases": "home-btn-view-cases",
+    "number-lookup": "home-btn-number-lookup",
+    "ownership": "home-btn-ownership",
+    "reports": "home-btn-reports",
+    "watchlist": "home-btn-watchlist",
+    "common-numbers": "home-btn-common",
+    "import": "home-btn-import",
+    "assistant": "home-btn-assistant",
+    "audit": "home-btn-audit"
+  };
+
+  document.querySelectorAll(".sidebar-module-link").forEach(btn => {
+    const isModMatch = btn.id === `mod-btn-${viewName}`;
+    const isHomeMatch = btn.id === (homeIdMap[viewName] || "");
+    btn.classList.toggle("active", isModMatch || isHomeMatch);
+  });
+
   dispatchViewLoad(viewName);
 }
 
 function dispatchViewLoad(viewName) {
+  if (viewName === "cases") {
+    loadCasesDirectoryView();
+    return;
+  }
   if (!currentCaseId) return;
 
   switch (viewName) {
     case "dashboard":
       loadDashboardDistribution();
+      loadSuspectThreatRadar();
+      load24x7Heatmap();
+      break;
+    case "advanced-cdr":
+      loadSuspectWorkspace();
+      break;
+    case "graph":
+      loadGraphAnalyticsView();
+      break;
+    case "network-analysis":
+      loadNetworkGraph();
+      loadNetworkAnalysisView();
       break;
     case "raw-cdr":
       loadRawCdrPage(1);
       break;
     case "mfc":
       loadMfcView();
-      break;
-    case "graph":
-      loadNetworkGraph();
       break;
     case "first-last":
       loadFirstLastView();
@@ -562,9 +658,6 @@ function dispatchViewLoad(viewName) {
     case "night-locations":
       loadNightLocationsView();
       break;
-    case "network-analysis":
-      loadNetworkAnalysisView();
-      break;
     case "imei-patterns":
       loadImeiPatternsView();
       break;
@@ -594,6 +687,9 @@ function dispatchViewLoad(viewName) {
       break;
     case "link-analysis":
       runLinkAnalysis();
+      break;
+    case "watchlist":
+      loadWatchlistView();
       break;
     case "assistant":
       loadObservations();
@@ -1418,6 +1514,7 @@ async function loadNetworkGraph() {
       ],
       layout: {
         name: "cose",
+        animate: false,
         idealEdgeLength: 100,
         nodeOverlap: 20,
         refresh: 20,
@@ -1429,7 +1526,7 @@ async function loadNetworkGraph() {
         edgeElasticity: 100,
         nestingFactor: 5,
         gravity: 80,
-        numIter: 1000
+        numIter: 400
       }
     });
 
@@ -2381,6 +2478,11 @@ async function loadCaseBatches() {
 // ----------------- MODULE: AUDIT LOG (SECTION 65B) -----------------
 async function loadAuditLogs() {
   const tbody = document.getElementById("audit-table-body");
+  if (!tbody) return;
+  if (currentUser && currentUser.role === "investigating_officer") {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:18px;color:#94a3b8;">Audit logs require Senior Officer (SP) or Admin clearance. <button class="btn-save-case" style="padding:3px 10px;font-size:11px;margin-left:8px;" onclick="switchRole('sp_verma')">Switch to SP Verma</button></td></tr>`;
+    return;
+  }
   tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;"><div class="spinner"></div> Fetching immutable Section 65B audit trail...</td></tr>`;
 
   try {
@@ -2639,7 +2741,11 @@ async function handleCreateCase(e) {
   e.preventDefault();
   const id = document.getElementById("newcase-id").value.trim();
   const title = document.getElementById("newcase-title").value.trim();
+  const case_type = document.getElementById("newcase-type")?.value || "Murder";
+  const police_station = document.getElementById("newcase-station")?.value.trim() || "";
+  const investigator_name = document.getElementById("newcase-io")?.value.trim() || "";
   const desc = document.getElementById("newcase-desc").value.trim();
+  const status = document.getElementById("newcase-status")?.value || "ACTIVE";
 
   try {
     const res = await fetch("/api/cases", {
@@ -2648,16 +2754,27 @@ async function handleCreateCase(e) {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${currentToken}`
       },
-      body: JSON.stringify({ id, title, description: desc })
+      body: JSON.stringify({
+        id,
+        title,
+        description: desc,
+        case_type,
+        police_station,
+        investigator_name,
+        status
+      })
     });
     const data = await res.json();
     if (res.ok) {
-      alert(`Case ${id} registered successfully!`);
       closeNewCaseModal();
-      await loadCasesList();
+      e.target.reset();
       currentCaseId = id;
-      document.getElementById("case-selector").value = currentCaseId;
+      await loadCasesList();
+      const sel = document.getElementById("case-selector");
+      if (sel) sel.value = currentCaseId;
       await onCaseSelected(currentCaseId);
+      // Offer immediate upload view for new empty case
+      switchView("import");
     } else {
       alert(`Error: ${data.detail || "Failed to create case"}`);
     }
@@ -2935,6 +3052,30 @@ function populateDynamicCaseUI(analytics) {
   const p3 = suspects[2]?.phone || "";
   const p4 = suspects[3]?.phone || "";
 
+  // Update suspect count in header pill
+  const sHdrSus = document.getElementById("stat-hdr-suspects");
+  if (sHdrSus) sHdrSus.innerText = suspects.length;
+
+  // Populate Dashboard Target Suspects Chips dynamically (Click -> Opens Image 3 Suspect Workspace!)
+  const dashChips = document.getElementById("dash-suspects-chips");
+  if (dashChips) {
+    if (suspects.length > 0) {
+      dashChips.innerHTML = "";
+      suspects.forEach(s => {
+        const btn = document.createElement("button");
+        btn.className = "chip-btn";
+        btn.innerHTML = `<b>${s.name || s.role || "Target"}</b>: ${s.phone || ""}`;
+        btn.onclick = () => {
+          currentSuspectPhone = s.phone;
+          enterInvestigationWorkspace("advanced-cdr");
+        };
+        dashChips.appendChild(btn);
+      });
+    } else {
+      dashChips.innerHTML = `<span style="color:var(--text-muted);font-size:12px;">Upload CDR files to auto-extract top syndicate targets.</span>`;
+    }
+  }
+
   // Populate map suspect selector dynamically
   const mapSel = document.getElementById("map-suspect-select");
   if (mapSel) {
@@ -3200,4 +3341,842 @@ async function runLinkAnalysis() {
   } catch (e) {
     box.innerHTML = `<p style="color:#fca5a5;">Error running link analysis.</p>`;
   }
+}
+
+
+// ==============================================================================
+// HOME SIDEBAR DEDICATED VIEWS: CASES DIRECTORY, ENTITY LOOKUP & WATCHLIST
+// ==============================================================================
+let cachedCasesList = [];
+
+async function loadCasesDirectoryView() {
+  const tbody = document.getElementById("cases-page-tbody");
+  if (!tbody) return;
+  tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:#64748b;">Loading cases directory...</td></tr>`;
+  try {
+    const res = await fetch("/api/cases", { headers: { "Authorization": `Bearer ${currentToken}` } });
+    if (!res.ok) return;
+    cachedCasesList = await res.json();
+    renderCasesDirectoryRows(cachedCasesList);
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:#f87171;">Error fetching cases.</td></tr>`;
+  }
+}
+
+function renderCasesDirectoryRows(list) {
+  const tbody = document.getElementById("cases-page-tbody");
+  if (!tbody) return;
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:#64748b;">No matching cases found. Click "+ Add New Case" to register one.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = list.map(c => `
+    <tr>
+      <td><b style="color:#38bdf8;font-family:monospace;">${c.id}</b></td>
+      <td><b>${c.title}</b></td>
+      <td><span class="metric-card-badge badge-purple">${c.case_type || "Cyber / Telecom"}</span></td>
+      <td>${c.police_station || "State Cyber Cell"}</td>
+      <td>${c.investigator_name || c.created_by}</td>
+      <td><b>${(c.cdr_count || 0).toLocaleString()}</b></td>
+      <td><b>${(c.ipdr_count || 0).toLocaleString()}</b></td>
+      <td>
+        <select class="form-control" style="padding:3px 6px;font-size:11px;width:125px;" onchange="updateCaseStatusFromDir('${c.id}', this.value)">
+          <option value="ACTIVE" ${c.status === "ACTIVE" ? "selected" : ""}>ACTIVE</option>
+          <option value="PENDING" ${c.status === "PENDING" ? "selected" : ""}>PENDING</option>
+          <option value="UNDER_SCRUTINY" ${c.status === "UNDER_SCRUTINY" ? "selected" : ""}>UNDER REVIEW</option>
+          <option value="COMPLETED" ${c.status === "COMPLETED" ? "selected" : ""}>COMPLETED</option>
+        </select>
+      </td>
+      <td>
+        <div style="display:flex;gap:6px;">
+          <button class="btn-save-case" style="padding:4px 10px;font-size:11.5px;" onclick="openCaseInWorkspace('${c.id}')">Open Workspace</button>
+          <button class="btn-action-suspect" style="padding:4px 8px;font-size:11px;" onclick="changeActiveCase('${c.id}').then(() => switchView('import'))">Upload Data</button>
+        </div>
+      </td>
+    </tr>
+  `).join("");
+}
+
+function filterCasesPage() {
+  const q = (document.getElementById("cases-dir-search")?.value || "").toLowerCase();
+  const filtered = cachedCasesList.filter(c =>
+    c.id.toLowerCase().includes(q) ||
+    c.title.toLowerCase().includes(q) ||
+    (c.police_station || "").toLowerCase().includes(q) ||
+    (c.case_type || "").toLowerCase().includes(q)
+  );
+  renderCasesDirectoryRows(filtered);
+}
+
+async function updateCaseStatusFromDir(caseId, status) {
+  try {
+    await fetch(`/api/cases/${encodeURIComponent(caseId)}/status`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${currentToken}`
+      },
+      body: JSON.stringify({ status })
+    });
+    await loadExecutiveMetrics(currentCaseId);
+  } catch (e) {}
+}
+
+async function openCaseInWorkspace(caseId) {
+  currentCaseId = caseId;
+  const sel = document.getElementById("case-selector");
+  if (sel) sel.value = caseId;
+  await onCaseSelected(caseId);
+  enterInvestigationWorkspace(currentCaseHasData ? "advanced-cdr" : "import");
+}
+
+async function runNumberLookup() {
+  const q = document.getElementById("number-lookup-input")?.value.trim();
+  const box = document.getElementById("number-lookup-results");
+  if (!q || !box) return;
+  box.innerHTML = `<div class="spinner"></div> Querying CDR/IPDR/TAC databases for <b>${q}</b>...`;
+
+  try {
+    const url = `/api/lookup?q=${encodeURIComponent(q)}${currentCaseId ? `&case_id=${encodeURIComponent(currentCaseId)}` : ""}`;
+    const res = await fetch(url, { headers: { "Authorization": `Bearer ${currentToken}` } });
+    if (!res.ok) return;
+    const d = await res.json();
+
+    if (!d.found) {
+      box.innerHTML = `<div class="module-empty-banner"><b style="color:#f8fafc;">No records matched "${q}"</b><p style="color:#64748b;margin-top:4px;font-size:12px;">Upload CDR/IPDR files containing this entity or try searching across all cases.</p></div>`;
+      return;
+    }
+
+    const tacHtml = d.tac_device && d.tac_device.brand
+      ? `<div class="summary-tile"><div class="tile-val" style="font-size:15px;color:#38bdf8;">${d.tac_device.brand} ${d.tac_device.model || ""}</div><div class="tile-lbl">TAC Device (${d.tac_device.generation || "4G/5G"})</div></div>`
+      : `<div class="summary-tile"><div class="tile-val">${d.imeis.length}</div><div class="tile-lbl">Linked IMEIs</div></div>`;
+
+    box.innerHTML = `
+      <div class="quick-summary-grid" style="margin-bottom:14px;">
+        <div class="summary-tile"><div class="tile-val" style="color:#38bdf8;font-size:15px;">${d.classification}</div><div class="tile-lbl">Classification</div></div>
+        <div class="summary-tile"><div class="tile-val">${d.total_cdr_hits}</div><div class="tile-lbl">CDR Records</div></div>
+        <div class="summary-tile"><div class="tile-val">${d.total_ipdr_hits}</div><div class="tile-lbl">IPDR Sessions</div></div>
+        <div class="summary-tile"><div class="tile-val">${d.towers.length}</div><div class="tile-lbl">Cell Towers</div></div>
+        ${tacHtml}
+      </div>
+      <div class="grid-2" style="gap:14px;">
+        <div class="card" style="margin-bottom:0;">
+          <div class="card-header"><div class="card-title">Top Linked Peers</div></div>
+          <div class="table-container" style="max-height:240px;overflow-y:auto;">
+            <table>
+              <thead><tr><th>Peer Number</th><th>Interactions</th></tr></thead>
+              <tbody>${d.top_peers.map(p => `<tr><td><b>${p.number}</b></td><td><span class="metric-card-badge badge-blue">${p.count}</span></td></tr>`).join("") || '<tr><td colspan="2">No peers</td></tr>'}</tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:0;">
+          <div class="card-header"><div class="card-title">Tower Presence</div></div>
+          <div class="table-container" style="max-height:240px;overflow-y:auto;">
+            <table>
+              <thead><tr><th>Cell ID</th><th>Location</th></tr></thead>
+              <tbody>${d.towers.map(t => `<tr><td style="font-family:monospace;color:#fbbf24;">${t.cell_id}</td><td>${t.area_name}</td></tr>`).join("") || '<tr><td colspan="2">No tower hits</td></tr>'}</tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    box.innerHTML = `<p style="color:#f87171;">Error querying entity profile.</p>`;
+  }
+}
+
+async function loadWatchlistView() {
+  if (!currentCaseId) return;
+  const velBox = document.getElementById("watchlist-velocity-box");
+  const thrBox = document.getElementById("watchlist-threats-box");
+
+  if (velBox) {
+    velBox.innerHTML = `<div class="spinner"></div> Scanning cell tower transitions for impossible travel velocity (>120 km/h)...`;
+    try {
+      const r = await fetch(`/api/cases/${currentCaseId}/velocity-anomalies`, { headers: { "Authorization": `Bearer ${currentToken}` } });
+      const items = r.ok ? await r.json() : [];
+      if (!items.length) {
+        velBox.innerHTML = `<p style="color:#64748b;font-size:12.5px;">No impossible travel velocity anomalies detected in active case.</p>`;
+      } else {
+        velBox.innerHTML = `<div class="table-container"><table><thead><tr><th>Target</th><th>From Tower</th><th>To Tower</th><th>Distance</th><th>Elapsed</th><th>Speed</th><th>Alert</th></tr></thead><tbody>${items.map(a => `
+          <tr>
+            <td><b>${a.suspect_number}</b></td>
+            <td>${a.from_tower} <small>(${a.from_time})</small></td>
+            <td>${a.to_tower} <small>(${a.to_time})</small></td>
+            <td>${a.distance_km} km</td>
+            <td>${a.time_elapsed_min} min</td>
+            <td><b style="color:#f87171;">${a.calculated_speed_kmh} km/h</b></td>
+            <td><span class="metric-card-badge badge-red">${a.risk_level}</span></td>
+          </tr>
+        `).join("")}</tbody></table></div>`;
+      }
+    } catch (e) {
+      velBox.innerHTML = `<p style="color:#f87171;">Error checking velocity anomalies.</p>`;
+    }
+  }
+
+  if (thrBox) {
+    try {
+      const res = await fetch(`/api/cases/${currentCaseId}/threat-scoring`, { headers: { "Authorization": `Bearer ${currentToken}` } });
+      const scores = res.ok ? await res.json() : [];
+      if (!scores.length) {
+        thrBox.innerHTML = `<p style="color:#64748b;">Upload CDR records to evaluate suspect threat profiles.</p>`;
+      } else {
+        thrBox.innerHTML = scores.map(s => `
+          <div class="threat-card">
+            <div class="threat-card-header">
+              <div>
+                <div class="threat-card-name">${s.name}</div>
+                <div class="threat-card-phone">${s.phone}</div>
+              </div>
+              <span class="threat-badge threat-badge-${(s.risk_level || 'low').toLowerCase()}">${s.risk_level} (${s.threat_score}/100)</span>
+            </div>
+            <div class="threat-archetype-chip">${s.archetype}</div>
+            <div class="threat-factors-list">${(s.factors || []).map(f => `<span class="threat-factor-pill">${f}</span>`).join("")}</div>
+            <div class="threat-card-actions">
+              <button class="btn-save-case" style="padding:4px 10px;font-size:11px;" onclick="currentSuspectPhone='${s.phone}'; enterInvestigationWorkspace('advanced-cdr');">Investigate &rarr;</button>
+            </div>
+          </div>
+        `).join("");
+      }
+    } catch (e) {}
+  }
+}
+
+// ==============================================================================
+// ADVANCED SUSPECT WORKSPACE (IMAGE 3), GRAPH ANALYTICS (IMAGE 4) & 7 POLICE MAPS
+// ==============================================================================
+
+async function loadSuspectWorkspace(targetPhone = null) {
+  if (!currentCaseId) return;
+  const sel = document.getElementById("suspect-workspace-select");
+
+  let phone = targetPhone || (sel ? sel.value : "") || currentSuspectPhone;
+  if (!phone && cachedAnalytics?.suspects?.length > 0) {
+    phone = cachedAnalytics.suspects[0].phone;
+  }
+  currentSuspectPhone = phone;
+
+  if (sel && cachedAnalytics?.suspects?.length > 0) {
+    sel.innerHTML = `<option value="">-- Switch Suspect --</option>`;
+    cachedAnalytics.suspects.forEach(s => {
+      const opt = document.createElement("option");
+      opt.value = s.phone;
+      opt.textContent = `${s.name || 'Target'}: ${s.phone}`;
+      if (s.phone === currentSuspectPhone) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }
+
+  try {
+    const url = phone 
+      ? `/api/cases/${currentCaseId}/suspect/${encodeURIComponent(phone)}/summary`
+      : `/api/cases/${currentCaseId}/suspect/_/summary`;
+    const res = await fetch(url, { headers: { "Authorization": `Bearer ${currentToken}` } });
+    if (!res.ok) return;
+    const data = await res.json();
+
+    const phoneDisp = document.getElementById("suspect-phone-display");
+    const subPhone = document.getElementById("suspect-subtitle-phone");
+    const subRows = document.getElementById("suspect-subtitle-rows");
+    if (phoneDisp) phoneDisp.innerText = data.suspect_phone || "No Suspect Selected";
+    if (subPhone) subPhone.innerText = data.suspect_phone || "All Case Rows";
+    if (subRows) subRows.innerText = (data.total_rows || 0).toLocaleString();
+
+    // 10 Centered KPI Summary Cards (Image 3)
+    const mapFields = {
+      "sum-target-op": data.target_operator || "N/A",
+      "sum-total-calls": (data.total_calls || 0).toLocaleString(),
+      "sum-total-sms": (data.total_sms || 0).toLocaleString(),
+      "sum-total-contacts": (data.total_contacts || 0).toLocaleString(),
+      "sum-total-imeis": data.total_imeis || 0,
+      "sum-total-imsis": data.total_imsis || 0,
+      "sum-total-locations": data.total_locations || 0,
+      "sum-total-active-days": data.total_active_days || 0,
+      "sum-intl-contacts": data.international_contacts || 0,
+      "sum-ownership-found": data.ownership_found || 0
+    };
+    for (const [id, val] of Object.entries(mapFields)) {
+      const el = document.getElementById(id);
+      if (el) el.innerText = val;
+    }
+
+    // Network Distribution Summary (Image 3)
+    const statBoxes = document.getElementById("network-dist-stat-boxes");
+    const barsContainer = document.getElementById("network-dist-bars-container");
+    const totalUniq = data.network_distribution?.total_unique_numbers || 0;
+    const ops = data.network_distribution?.operators || [];
+
+    if (statBoxes) {
+      statBoxes.innerHTML = `
+        <div class="net-stat-box">
+          <div class="net-stat-val">${totalUniq.toLocaleString()}</div>
+          <div class="net-stat-lbl">Total Unique Mobile Numbers</div>
+        </div>
+      `;
+      ops.forEach(op => {
+        statBoxes.innerHTML += `
+          <div class="net-stat-box">
+            <div class="net-stat-val" style="color: ${op.color};">${op.count}</div>
+            <div class="net-stat-lbl">${op.operator} (${op.percentage}%)</div>
+          </div>
+        `;
+      });
+    }
+
+    if (barsContainer) {
+      barsContainer.innerHTML = ops.map(op => `
+        <div class="net-bar-row">
+          <div class="net-bar-name">${op.operator}</div>
+          <div class="net-bar-track">
+            <div class="net-bar-fill" style="width: ${op.percentage}%; background: ${op.color};"></div>
+          </div>
+          <div class="net-bar-count">${op.count}</div>
+          <div class="net-bar-pct">${op.percentage}%</div>
+        </div>
+      `).join("") || `<div style="color:#64748b;font-size:12px;">Upload CDR files to analyze network operator breakdown.</div>`;
+    }
+
+    // Render Suspect Recent Records Table
+    const advBody = document.getElementById("adv-cdr-tbody");
+    if (advBody) {
+      const recs = data.recent_records || [];
+      advBody.innerHTML = recs.map(r => `
+        <tr>
+          <td style="font-family:monospace;font-size:11px;">${r.start_time}</td>
+          <td><b>${r.a_number}</b></td>
+          <td><b>${r.b_number}</b></td>
+          <td><span class="metric-card-badge ${r.call_type === 'IN' ? 'badge-green' : 'badge-blue'}">${r.call_type}</span></td>
+          <td>${r.duration_sec}s</td>
+          <td style="font-family:monospace;font-size:11px;color:#38bdf8;">${r.imei || "-"}</td>
+          <td style="font-family:monospace;font-size:11px;color:#fbbf24;">${r.cell_id || "-"}</td>
+        </tr>
+      `).join("") || `<tr><td colspan="7" style="text-align:center;color:#64748b;">No records available for selected target.</td></tr>`;
+    }
+  } catch (err) {
+    console.error("Error loading suspect workspace:", err);
+  }
+}
+
+async function runAdvancedCdrFilter() {
+  if (!currentCaseId) return;
+  const search = document.getElementById("adv-cdr-num")?.value.trim() || currentSuspectPhone || "";
+  const durMin = parseInt(document.getElementById("adv-cdr-dur")?.value || "0", 10);
+  const ctype = document.getElementById("adv-cdr-type")?.value || "";
+  const advBody = document.getElementById("adv-cdr-tbody");
+  if (!advBody) return;
+
+  advBody.innerHTML = `<tr><td colspan="7" style="text-align:center;">Querying filtered records...</td></tr>`;
+  try {
+    const res = await fetch(`/api/cases/${currentCaseId}/raw-cdr?page=1&limit=200&search=${encodeURIComponent(search)}&call_type=${encodeURIComponent(ctype)}`, {
+      headers: { "Authorization": `Bearer ${currentToken}` }
+    });
+    const data = res.ok ? await res.json() : { records: [] };
+    const filtered = (data.records || []).filter(r => (r.duration_sec || 0) >= durMin);
+    advBody.innerHTML = filtered.map(r => `
+      <tr>
+        <td style="font-family:monospace;font-size:11px;">${r.start_time}</td>
+        <td><b>${r.a_number}</b></td>
+        <td><b>${r.b_number}</b></td>
+        <td><span class="metric-card-badge ${r.call_type === 'IN' ? 'badge-green' : 'badge-blue'}">${r.call_type}</span></td>
+        <td>${r.duration_sec}s</td>
+        <td style="font-family:monospace;font-size:11px;color:#38bdf8;">${r.imei || "-"}</td>
+        <td style="font-family:monospace;font-size:11px;color:#fbbf24;">${r.cell_id || "-"}</td>
+      </tr>
+    `).join("") || `<tr><td colspan="7" style="text-align:center;color:#64748b;">No records match custom filter.</td></tr>`;
+  } catch (e) {}
+}
+
+function downloadSuspectExport(fmt) {
+  if (!currentCaseId) return;
+  const phone = currentSuspectPhone || "";
+  window.open(`/api/cases/${currentCaseId}/report?format=${fmt}&suspect=${encodeURIComponent(phone)}`, "_blank");
+}
+
+function pinCurrentSuspect() {
+  if (!currentSuspectPhone) return;
+  localStorage.setItem(`pinned_suspect_${currentCaseId}`, currentSuspectPhone);
+  const tagEl = document.querySelector(".suspect-tag");
+  if (tagEl) tagEl.innerText = `INVESTIGATION WORKSPACE · PINNED (${currentSuspectPhone})`;
+}
+
+function toggleAutoHide() {
+  toggleSidebarCollapsed();
+}
+
+function openSuspectEvidence() {
+  viewEvidence("CDR", "Uploaded Case Records", 1);
+}
+
+// ----------------- IMAGE 4: GRAPH ANALYTICS 4-QUADRANT VIEW -----------------
+async function loadGraphAnalyticsView() {
+  if (!currentCaseId) return;
+
+  try {
+    const rawRes = await fetch(`/api/cases/${currentCaseId}/raw-cdr?page=1&limit=500`, {
+      headers: { "Authorization": `Bearer ${currentToken}` }
+    });
+    const rawData = rawRes.ok ? await rawRes.json() : { records: [] };
+    const records = rawData.records || [];
+
+    // --- QUADRANT 1: Communication Timeline ---
+    const dateCounts = {};
+    records.forEach(r => {
+      if (!r.start_time) return;
+      const d = r.start_time.split("T")[0] || r.start_time.split(" ")[0];
+      dateCounts[d] = (dateCounts[d] || 0) + 1;
+    });
+    const sortedDates = Object.keys(dateCounts).sort();
+    const timelineCounts = sortedDates.map(d => dateCounts[d]);
+    const totalEvents = timelineCounts.reduce((a, b) => a + b, 0) || records.length;
+    let peakDate = sortedDates[0] || "None";
+    let peakCount = 0;
+    sortedDates.forEach(d => {
+      if (dateCounts[d] > peakCount) {
+        peakCount = dateCounts[d];
+        peakDate = d;
+      }
+    });
+
+    const metaTl = document.getElementById("quad-meta-timeline");
+    if (metaTl) {
+      metaTl.innerText = `Total: ${totalEvents.toLocaleString()}   Days: ${sortedDates.length}   Peak: ${peakDate} (${peakCount})`;
+    }
+
+    const tBodyTl = document.getElementById("quad-tbody-timeline");
+    if (tBodyTl) {
+      tBodyTl.innerHTML = sortedDates.slice(0, 30).map(d => {
+        const cnt = dateCounts[d];
+        const pct = totalEvents ? ((cnt / totalEvents) * 100).toFixed(1) : "0.0";
+        return `<tr><td>${d}</td><td style="text-align:right;"><b>${cnt}</b></td><td style="text-align:right;color:#38bdf8;">${pct}%</td></tr>`;
+      }).join("") || `<tr><td colspan="3" style="text-align:center;color:#64748b;">No records available</td></tr>`;
+    }
+
+    const ctxTl = document.getElementById("timeline-chart")?.getContext("2d");
+    if (ctxTl) {
+      if (chartTimelineInstance) chartTimelineInstance.destroy();
+      chartTimelineInstance = new Chart(ctxTl, {
+        type: "line",
+        data: {
+          labels: sortedDates,
+          datasets: [{
+            label: "Events",
+            data: timelineCounts,
+            borderColor: "#22d3ee",
+            backgroundColor: "rgba(34, 211, 238, 0.08)",
+            borderWidth: 2,
+            pointRadius: 2,
+            pointHoverRadius: 4,
+            tension: 0.38,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: "#64748b", font: { size: 9 } }, grid: { display: false } },
+            y: { ticks: { color: "#64748b", font: { size: 9 } }, grid: { color: "rgba(255,255,255,0.04)" } }
+          }
+        }
+      });
+    }
+
+    // --- QUADRANT 2: Hourly Call Pattern (Image 4 Red Peak + Teal Bars + 3 KPIs) ---
+    const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0") + ":00");
+    const hourlyCounts = Array(24).fill(0);
+    records.forEach(r => {
+      if (!r.start_time) return;
+      try {
+        const timePart = r.start_time.split("T")[1] || r.start_time.split(" ")[1];
+        if (timePart) {
+          const h = parseInt(timePart.split(":")[0], 10);
+          if (!isNaN(h) && h >= 0 && h < 24) hourlyCounts[h]++;
+        }
+      } catch (e) {}
+    });
+
+    let peakHourIdx = 0;
+    let peakHourVal = 0;
+    let activeHoursCount = 0;
+    hourlyCounts.forEach((cnt, idx) => {
+      if (cnt > 0) activeHoursCount++;
+      if (cnt > peakHourVal) {
+        peakHourVal = cnt;
+        peakHourIdx = idx;
+      }
+    });
+
+    const hKpiTot = document.getElementById("hourly-kpi-total");
+    const hKpiHrs = document.getElementById("hourly-kpi-hours");
+    const hKpiPk = document.getElementById("hourly-kpi-peak");
+    if (hKpiTot) hKpiTot.innerText = totalEvents.toLocaleString();
+    if (hKpiHrs) hKpiHrs.innerText = activeHoursCount;
+    if (hKpiPk) hKpiPk.innerText = `${String(peakHourIdx).padStart(2, "0")}:00 (${peakHourVal})`;
+
+    const tBodyH = document.getElementById("quad-tbody-hourly");
+    if (tBodyH) {
+      let sumPct = 0;
+      tBodyH.innerHTML = hours.map((h, i) => {
+        const cnt = hourlyCounts[i];
+        const pctVal = totalEvents ? (cnt / totalEvents) * 100 : 0;
+        sumPct += pctVal;
+        const isPeak = (i === peakHourIdx && peakHourVal > 0);
+        return `<tr style="${isPeak ? 'background:rgba(244,63,94,0.12);font-weight:700;' : ''}">
+          <td>${h}</td><td style="text-align:right;">${cnt.toLocaleString()}</td><td style="text-align:right;color:${isPeak ? '#fb7185' : '#38bdf8'};">${pctVal.toFixed(1)}%</td>
+        </tr>`;
+      }).join("") + `<tr style="border-top:1px solid rgba(255,255,255,0.1);color:#64748b;"><td colspan="2">Total</td><td style="text-align:right;">${sumPct.toFixed(1)}%</td></tr>`;
+    }
+
+    const ctxH = document.getElementById("hourly-chart")?.getContext("2d");
+    if (ctxH) {
+      if (chartHourlyInstance) chartHourlyInstance.destroy();
+      const bgColors = hourlyCounts.map((_, i) => (i === peakHourIdx && peakHourVal > 0) ? "#f43f5e" : "#14b8a6");
+      chartHourlyInstance = new Chart(ctxH, {
+        type: "bar",
+        data: {
+          labels: hours,
+          datasets: [{
+            data: hourlyCounts,
+            backgroundColor: bgColors,
+            borderRadius: { topLeft: 4, topRight: 4 },
+            borderSkipped: false
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: "#64748b", font: { size: 9 }, maxRotation: 0 }, grid: { display: false } },
+            y: { ticks: { color: "#64748b", font: { size: 9 } }, grid: { color: "rgba(255,255,255,0.04)" } }
+          }
+        }
+      });
+    }
+
+    // --- QUADRANT 3: Call Type Distribution ---
+    const typeCounts = { "Incoming": 0, "Outgoing": 0, "SMS-In": 0, "SMS-Out": 0, "Roaming": 0 };
+    records.forEach(r => {
+      const ct = (r.call_type || "").toUpperCase();
+      if (ct.includes("ROAM")) typeCounts["Roaming"]++;
+      else if (ct.includes("SMS") && ct.includes("IN")) typeCounts["SMS-In"]++;
+      else if (ct.includes("SMS")) typeCounts["SMS-Out"]++;
+      else if (ct.includes("IN")) typeCounts["Incoming"]++;
+      else typeCounts["Outgoing"]++;
+    });
+
+    const tBodyCt = document.getElementById("quad-tbody-calltype");
+    if (tBodyCt) {
+      tBodyCt.innerHTML = Object.entries(typeCounts).map(([type, cnt]) => {
+        const pct = totalEvents ? ((cnt / totalEvents) * 100).toFixed(1) : "0.0";
+        return `<tr><td>${type}</td><td style="text-align:right;"><b>${cnt.toLocaleString()}</b></td><td style="text-align:right;color:#38bdf8;">${pct}%</td></tr>`;
+      }).join("");
+    }
+
+    const ctxCt = document.getElementById("calltype-chart")?.getContext("2d");
+    if (ctxCt) {
+      if (chartCallTypeInstance) chartCallTypeInstance.destroy();
+      chartCallTypeInstance = new Chart(ctxCt, {
+        type: "doughnut",
+        data: {
+          labels: Object.keys(typeCounts),
+          datasets: [{
+            data: Object.values(typeCounts),
+            backgroundColor: ["#3b82f6", "#14b8a6", "#f59e0b", "#a855f7", "#f43f5e"],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: "62%",
+          plugins: { legend: { position: "right", labels: { color: "#94a3b8", font: { size: 11 }, boxWidth: 12 } } }
+        }
+      });
+    }
+
+    // --- QUADRANT 4: Call Duration Distribution ---
+    const durBins = { "0s (Missed/SMS)": 0, "1-30s": 0, "31-60s": 0, "1-5m": 0, ">5m": 0 };
+    records.forEach(r => {
+      const d = r.duration_sec || 0;
+      if (d === 0) durBins["0s (Missed/SMS)"]++;
+      else if (d <= 30) durBins["1-30s"]++;
+      else if (d <= 60) durBins["31-60s"]++;
+      else if (d <= 300) durBins["1-5m"]++;
+      else durBins[">5m"]++;
+    });
+
+    const tBodyDur = document.getElementById("quad-tbody-duration");
+    if (tBodyDur) {
+      tBodyDur.innerHTML = Object.entries(durBins).map(([range, cnt]) => {
+        const pct = totalEvents ? ((cnt / totalEvents) * 100).toFixed(1) : "0.0";
+        return `<tr><td>${range}</td><td style="text-align:right;"><b>${cnt.toLocaleString()}</b></td><td style="text-align:right;color:#38bdf8;">${pct}%</td></tr>`;
+      }).join("");
+    }
+
+    const ctxDur = document.getElementById("duration-chart")?.getContext("2d");
+    if (ctxDur) {
+      if (chartDurationInstance) chartDurationInstance.destroy();
+      chartDurationInstance = new Chart(ctxDur, {
+        type: "bar",
+        data: {
+          labels: Object.keys(durBins),
+          datasets: [{
+            data: Object.values(durBins),
+            backgroundColor: ["#f43f5e", "#f59e0b", "#3b82f6", "#14b8a6", "#a855f7"],
+            borderRadius: { topLeft: 4, topRight: 4 }
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: "#64748b", font: { size: 10 } }, grid: { display: false } },
+            y: { ticks: { color: "#64748b", font: { size: 9 } }, grid: { color: "rgba(255,255,255,0.04)" } }
+          }
+        }
+      });
+    }
+
+  } catch (err) {
+    console.error("Error loading graph analytics:", err);
+  }
+}
+
+function exportQuadCSV(type) {
+  const table = document.getElementById(`quad-tbody-${type}`)?.closest("table");
+  if (!table) return;
+  let csv = [];
+  for (let row of table.rows) {
+    let cols = [];
+    for (let cell of row.cells) cols.push(`"${cell.innerText.replace(/"/g, '""')}"`);
+    csv.push(cols.join(","));
+  }
+  const blob = new Blob([csv.join("\n")], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Graph_Analytics_${type}_${currentCaseId}.csv`;
+  a.click();
+}
+
+function exportQuadImage(canvasId) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const url = canvas.toDataURL("image/png");
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Graph_Widget_${canvasId}_${currentCaseId}.png`;
+  a.click();
+}
+
+function printQuad() {
+  window.print();
+}
+
+function toggleFullscreenQuad(cardId) {
+  const card = document.getElementById(cardId);
+  if (!card) return;
+  if (!document.fullscreenElement) {
+    card.requestFullscreen?.().catch(() => {});
+  } else {
+    document.exitFullscreen?.().catch(() => {});
+  }
+}
+
+function downloadAllGraphData() {
+  exportQuadCSV("timeline");
+  exportQuadCSV("hourly");
+}
+
+// ----------------- 7 POLICE GIS MAP MODES -----------------
+async function switchMapLayerMode(mode) {
+  activeMapMode = mode;
+  document.querySelectorAll(".map-pill-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.id === `btn-map-mode-${mode}`);
+  });
+
+  if (!leafletMap || !currentCaseId) return;
+  leafletLayerGroup.clearLayers();
+
+  const num = document.getElementById("map-suspect-select")?.value || currentSuspectPhone || (cachedAnalytics?.suspects?.[0]?.phone || "");
+  const descEl = document.getElementById("map-mode-desc");
+  const cntEl = document.getElementById("map-event-count");
+
+  if (mode === "towers") {
+    if (descEl) descEl.innerText = "Showing exact cell tower markers and call locations.";
+    await renderTowerMap(num);
+  } else if (mode === "heatmap") {
+    try {
+      const res = await fetch(`/api/cases/${currentCaseId}/towers/timeline?number=${encodeURIComponent(num)}`, {
+        headers: { "Authorization": `Bearer ${currentToken}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const agg = {};
+        (data.timeline || []).forEach(pt => {
+          const key = `${pt.lat},${pt.lon}`;
+          if (!agg[key]) agg[key] = { lat: pt.lat, lon: pt.lon, area: pt.area_name, count: 0 };
+          agg[key].count++;
+        });
+        const points = Object.values(agg);
+        const maxCnt = Math.max(...points.map(p => p.count), 1);
+        const bounds = [];
+        points.forEach(p => {
+          const ratio = p.count / maxCnt;
+          const color = ratio > 0.7 ? "#ef4444" : (ratio > 0.4 ? "#f97316" : "#eab308");
+          const c = L.circle([p.lat, p.lon], {
+            radius: 350 + ratio * 1200,
+            color: color,
+            fillColor: color,
+            fillOpacity: 0.42,
+            weight: 1
+          }).addTo(leafletLayerGroup);
+          c.bindPopup(`<b>Density Hotspot: ${p.area}</b><br/>Tower Hits: ${p.count}`);
+          bounds.push([p.lat, p.lon]);
+        });
+        if (bounds.length) leafletMap.fitBounds(bounds, { padding: [30, 30] });
+        if (descEl) descEl.innerText = "Density Heatmap: Concentric thermal zones scaled by communication frequency.";
+        if (cntEl) cntEl.innerText = `Hotspots: ${points.length}`;
+      }
+    } catch (e) {}
+  } else if (mode === "trajectory") {
+    if (descEl) descEl.innerText = "Chronological route trajectory with animated timeline playback.";
+    await renderTowerMap(num);
+    const scrubber = document.getElementById("trajectory-scrubber-bar");
+    if (scrubber) scrubber.scrollIntoView({ behavior: "smooth" });
+  } else if (mode === "daynight") {
+    try {
+      const res = await fetch(`/api/cases/${currentCaseId}/towers/timeline?number=${encodeURIComponent(num)}`, {
+        headers: { "Authorization": `Bearer ${currentToken}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const bounds = [];
+        let dayC = 0, nightC = 0;
+        (data.timeline || []).forEach(pt => {
+          const hour = pt.time ? parseInt((pt.time.split("T")[1] || pt.time.split(" ")[1] || "12").split(":")[0], 10) : 12;
+          const isNight = (hour >= 20 || hour < 8);
+          if (isNight) nightC++; else dayC++;
+          const color = isNight ? "#818cf8" : "#f59e0b";
+          const marker = L.circleMarker([pt.lat, pt.lon], {
+            radius: isNight ? 9 : 7,
+            color: color,
+            fillColor: color,
+            fillOpacity: 0.85,
+            weight: 2
+          }).addTo(leafletLayerGroup);
+          marker.bindPopup(`<b>${isNight ? 'Night Stay / Hideout (20-08h)' : 'Daytime Base (08-20h)'}</b><br/>Area: ${pt.area_name}<br/>Time: ${pt.time}<br/>Type: ${pt.call_type}`);
+          bounds.push([pt.lat, pt.lon]);
+        });
+        if (bounds.length) leafletMap.fitBounds(bounds, { padding: [30, 30] });
+        if (descEl) descEl.innerText = `Day/Night Clusters: Amber = Daytime (${dayC}) · Indigo = Night Hideout (${nightC}).`;
+        if (cntEl) cntEl.innerText = `Day: ${dayC} | Night: ${nightC}`;
+      }
+    } catch (e) {}
+  } else if (mode === "sectors") {
+    try {
+      const res = await fetch(`/api/cases/${currentCaseId}/towers/sectors?suspect=${encodeURIComponent(num)}`, {
+        headers: { "Authorization": `Bearer ${currentToken}` }
+      });
+      if (res.ok) {
+        const sectors = await res.json();
+        const bounds = [];
+        sectors.forEach(sec => {
+          const poly = L.polygon(sec.polygon, {
+            color: "#38bdf8",
+            fillColor: "#0284c7",
+            fillOpacity: 0.28,
+            weight: 1.5
+          }).addTo(leafletLayerGroup);
+          poly.bindPopup(`<b>Sector Antenna Cone</b><br/>Tower: ${sec.tower_name}<br/>Cell ID: ${sec.cell_id}<br/>Azimuth: ${sec.azimuth}&deg;<br/>Beamwidth: ${sec.beamwidth}&deg;`);
+          if (sec.polygon && sec.polygon[0]) bounds.push(sec.polygon[0]);
+        });
+        if (bounds.length) leafletMap.fitBounds(bounds, { padding: [35, 35] });
+        if (descEl) descEl.innerText = `Sector Azimuth Cones: Showing directional 120-degree BTS radio coverage beams (${sectors.length} sectors).`;
+        if (cntEl) cntEl.innerText = `Rendered ${sectors.length} Sector Cones`;
+      }
+    } catch (e) {}
+  } else if (mode === "meetings") {
+    try {
+      const suspects = cachedAnalytics?.suspects || [];
+      if (suspects.length >= 2) {
+        const res = await fetch(`/api/cases/${currentCaseId}/meetings?num1=${encodeURIComponent(suspects[0].phone)}&num2=${encodeURIComponent(suspects[1].phone)}&window_mins=30`, {
+          headers: { "Authorization": `Bearer ${currentToken}` }
+        });
+        if (res.ok) {
+          const meetings = await res.json();
+          const bounds = [];
+          meetings.forEach(m => {
+            const circle = L.circle([m.lat, m.lon], {
+              radius: 550,
+              color: "#ef4444",
+              fillColor: "#ef4444",
+              fillOpacity: 0.38,
+              weight: 2
+            }).addTo(leafletLayerGroup);
+            circle.bindPopup(`<b>Co-Location Rendezvous</b><br/>Tower: ${m.area_name}<br/>Time: ${m.approx_time}<br/>${suspects[0].phone}: ${m.suspect1_call_type}<br/>${suspects[1].phone}: ${m.suspect2_call_type}`);
+            bounds.push([m.lat, m.lon]);
+          });
+          if (bounds.length) leafletMap.fitBounds(bounds, { padding: [35, 35] });
+          if (descEl) descEl.innerText = `Co-Location Meetings: Found ${meetings.length} spatial-temporal overlaps (±30 min window).`;
+          if (cntEl) cntEl.innerText = `Meetings: ${meetings.length}`;
+        }
+      } else {
+        if (descEl) descEl.innerText = "Co-Location requires at least 2 active suspect targets in case CDRs.";
+      }
+    } catch (e) {}
+  } else if (mode === "velocity") {
+    try {
+      const res = await fetch(`/api/cases/${currentCaseId}/velocity-anomalies?suspect=${encodeURIComponent(num)}`, {
+        headers: { "Authorization": `Bearer ${currentToken}` }
+      });
+      if (res.ok) {
+        const anomalies = await res.json();
+        const tRes = await fetch(`/api/cases/${currentCaseId}/towers/timeline?number=${encodeURIComponent(num)}`, {
+          headers: { "Authorization": `Bearer ${currentToken}` }
+        });
+        const tData = tRes.ok ? await tRes.json() : { timeline: [] };
+        const coordMap = {};
+        (tData.timeline || []).forEach(pt => { coordMap[pt.cell_id] = [pt.lat, pt.lon]; });
+
+        const bounds = [];
+        anomalies.forEach(a => {
+          const p1 = coordMap[a.from_cell_id];
+          const p2 = coordMap[a.to_cell_id];
+          if (p1 && p2) {
+            const line = L.polyline([p1, p2], { color: "#f43f5e", weight: 3, dashArray: "6 6" }).addTo(leafletLayerGroup);
+            line.bindPopup(`<b>Impossible Travel Alert (${a.risk_level})</b><br/>${a.from_tower} &rarr; ${a.to_tower}<br/>Distance: ${a.distance_km} km in ${a.time_elapsed_min} min<br/>Calculated Speed: <b>${a.calculated_speed_kmh} km/h</b>`);
+            L.circleMarker(p1, { radius: 6, color: "#f43f5e", fillOpacity: 0.9 }).addTo(leafletLayerGroup);
+            L.circleMarker(p2, { radius: 6, color: "#f43f5e", fillOpacity: 0.9 }).addTo(leafletLayerGroup);
+            bounds.push(p1, p2);
+          }
+        });
+        if (bounds.length) leafletMap.fitBounds(bounds, { padding: [35, 35] });
+        if (descEl) descEl.innerText = anomalies.length
+          ? `Impossible Travel Alerts: Detected ${anomalies.length} anomalous tower hops (>120 km/h — possible SIM cloning).`
+          : "No impossible travel speed anomalies (>120 km/h) detected for this target.";
+        if (cntEl) cntEl.innerText = `Velocity Alerts: ${anomalies.length}`;
+      }
+    } catch (e) {}
+  }
+}
+
+function downloadMapKML() {
+  if (!currentCaseId) return;
+  const phone = currentSuspectPhone || "";
+  window.open(`/api/cases/${currentCaseId}/report?format=kml&suspect=${encodeURIComponent(phone)}`, "_blank");
+}
+
+function downloadMapKMZ() {
+  if (!currentCaseId) return;
+  const phone = currentSuspectPhone || "";
+  window.open(`/api/cases/${currentCaseId}/report?format=kmz&suspect=${encodeURIComponent(phone)}`, "_blank");
+}
+
+function toggleSidebarSuiteMode() {
+  toggleSidebarContext();
 }
