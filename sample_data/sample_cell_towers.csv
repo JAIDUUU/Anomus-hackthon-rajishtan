@@ -1,0 +1,15 @@
+cell_id,lac,lat,lon,area_name,azimuth,operator
+RAJ-JPR-101,4011,26.9124,75.7873,Jaipur - Sindhi Camp Central Bus Stand,60,Airtel
+RAJ-JPR-102,4011,26.9174,75.8056,Jaipur - MI Road Commercial Arcade,180,Jio
+RAJ-JPR-103,4012,26.8532,75.8052,Jaipur - Malviya Nagar World Trade Park,300,Airtel
+RAJ-JPR-104,4012,26.903,75.742,Jaipur - Vaishali Nagar Amrapali Circle,120,Vi
+RAJ-JPR-105,4013,26.9239,75.8267,Jaipur - Johari Bazaar Walled City,240,BSNL
+RAJ-JPR-106,4013,26.892,75.826,Jaipur - Raja Park Market,90,Jio
+RAJ-JPR-107,4014,26.9855,75.8513,Jaipur - Amer Fort Foothills,0,Airtel
+RAJ-JPR-108,4014,26.8289,75.8056,Jaipur - Jaipur International Airport Terminal 2,150,Jio
+RAJ-AJM-201,4021,26.4499,74.6399,Ajmer - Dargah Sharif Gateway,45,Airtel
+RAJ-AJM-202,4021,26.4691,74.639,Ajmer - Railway Junction Station,180,Vi
+RAJ-KOT-301,4031,25.18,75.83,Kota - Vigyan Nagar Coaching Hub,270,Jio
+RAJ-JOD-401,4041,26.29,73.02,Jodhpur - Clock Tower Sardar Market,90,Airtel
+RAJ-ALW-501,4051,27.553,76.6346,Alwar - Tijara Highway Junction,330,Jio
+RAJ-BHT-601,4061,27.2152,77.503,Bharatpur - Keoladeo National Park Road,120,Airtel
