@@ -1,31 +1,40 @@
 {
   "Overview": {
-    "description": "System architecture, core data flow, and Rajasthan Police Hackathon 2026 solution overview",
+    "description": "System architecture, Dual-Sidebar 28-module SPA workspace, SQLite ORM schema, and dynamic ingestion-first data flow",
     "components": [
       "app/main.py::app",
       "app/db.py::Base",
-      "app/db.py::Case"
+      "app/db.py::Case",
+      "app/static/app.js",
+      "app/static/index.html"
     ],
     "children": {}
   },
   "Ingestion_Engine": {
-    "description": "Heterogeneous CDR & IPDR normalization, dynamic mapping configs, phone/timestamp sanitization, and chain-of-custody tracking",
+    "description": "Multi-format (.csv, .tsv, .txt, .xlsx, .xls) ingestion, LEA preamble stripping, header inspector, 9 operator presets, and inline CellTower auto-discovery",
     "components": [
+      "app/ingest.py::read_tabular_bytes",
+      "app/ingest.py::inspect_uploaded_file",
       "app/ingest.py::normalize_phone_number",
       "app/ingest.py::parse_duration_to_sec",
       "app/ingest.py::parse_datetime_flexible",
       "app/ingest.py::ingest_cdr_data",
       "app/ingest.py::ingest_ipdr_data",
       "app/ingest.py::get_available_mappings",
-      "app/ingest.py::save_mapping_config"
+      "app/ingest.py::save_mapping_config",
+      "app/ingest.py::seed_towers_from_csv"
     ],
     "children": {}
   },
   "Forensic_Analytics": {
-    "description": "Comprehensive telecom analytics: MFC, cross-suspect correlation matrix, IMEI/SIM swaps, TAC handset intelligence, nocturnal ratios, and dormancy detection",
+    "description": "Suspect Investigation Workspace (10 KPIs), 0-100 Threat Risk Scoring, 24x7 Heatmap, MFC, Common Numbers, SIM/IMEI swaps, TAC lookup, and Service/ISD screening",
     "components": [
+      "app/analysis.py::get_suspect_workspace_summary",
+      "app/analysis.py::calculate_suspect_threat_scores",
+      "app/analysis.py::get_temporal_heatmap_24x7",
       "app/analysis.py::analyze_communication_patterns",
       "app/analysis.py::find_common_numbers",
+      "app/analysis.py::analyze_link_between_numbers",
       "app/analysis.py::detect_imei_sim_changes",
       "app/analysis.py::lookup_tac_device",
       "app/analysis.py::get_mfc_analysis",
@@ -34,42 +43,48 @@
       "app/analysis.py::get_missing_dates_analysis",
       "app/analysis.py::get_service_and_company_numbers",
       "app/analysis.py::get_international_intelligence",
+      "app/analysis.py::lookup_entity_profile",
       "app/analysis.py::global_search"
     ],
     "children": {}
   },
   "Geospatial_Tracking": {
-    "description": "Cell tower movement trajectory, azimuth sector tracking, and spatial-temporal co-location/meeting detection algorithms",
+    "description": "CGI-aware tower resolution, 7 Police GIS Map modes (Pin, Heatmap, Trajectory Scrubber, Day/Night, 65-deg Sector Cones, Co-Location, Velocity Anomalies)",
     "components": [
+      "app/analysis.py::_resolve_tower",
       "app/analysis.py::get_location_timeline",
+      "app/analysis.py::get_tower_sector_cones",
       "app/analysis.py::detect_meetings",
+      "app/analysis.py::get_velocity_anomalies",
       "app/analysis.py::get_movement_and_cell_changes",
-      "app/ingest.py::seed_towers_from_csv",
       "app/db.py::CellTower"
     ],
     "children": {}
   },
   "Network_Topology": {
-    "description": "Cytoscape.js network graph generation, caller-receiver edge weighting, degree centrality, and criminal syndicate core isolation",
+    "description": "4-Quadrant Graph Analytics with Cytoscape.js topology, hub centrality, mutual call pairs, and bilateral link analysis",
     "components": [
       "app/analysis.py::get_network_graph_data",
+      "app/analysis.py::analyze_link_between_numbers",
       "app/analysis.py::get_suspect_numbers_for_case"
     ],
     "children": {}
   },
   "IPDR_NAT_Resolver": {
-    "description": "Carrier-Grade NAT (CGNAT) resolution engine, triple-key matching (IP, port, timestamp window), and encrypted app signature detection",
+    "description": "Carrier-Grade NAT (CGNAT) triple-key resolution, 1930 cyber complaint batch matching, dynamic DB sample loader, and subscriber profiling",
     "components": [
       "app/ipdr.py::match_ipdr_session",
+      "app/ipdr.py::batch_match_ipdr_sessions",
       "app/ipdr.py::get_subscriber_ipdr_summary",
       "app/db.py::IPDRRecord"
     ],
     "children": {}
   },
   "AI_Investigation_Assistant": {
-    "description": "LangGraph copilot with bilingual English/Hinglish NLP, Section 5(2) Indian Telegraph Act guardrails, and Section 65B forensic citations",
+    "description": "LangGraph StateGraph copilot with English/Hindi/Hinglish routing, Section 5(2) metadata guardrails, Section 65B citations, and SP verification",
     "components": [
       "app/assistant.py::AgentState",
+      "app/assistant.py::build_investigation_graph",
       "app/assistant.py::run_ai_assistant",
       "app/assistant.py::extract_phone_numbers",
       "app/assistant.py::extract_ip_and_port",
@@ -78,36 +93,53 @@
     "children": {}
   },
   "Security_Audit_Chain": {
-    "description": "Multi-tier Role-Based Access Control (RBAC), tamper-evident SHA-256 hash chaining, and forensic chain-of-custody logging",
+    "description": "JWT/bcrypt Multi-Tier RBAC, SHA-256 hash-chained AuditLog ledger, integrity verification, and Section 65B / BSA 63 compliance",
     "components": [
       "app/auth.py::create_access_token",
       "app/auth.py::get_current_user",
       "app/auth.py::require_role",
       "app/auth.py::verify_password",
+      "app/audit.py::compute_audit_hash",
       "app/audit.py::log_audit_event",
-      "app/audit.py::get_audit_logs",
+      "app/audit.py::verify_audit_integrity",
       "app/db.py::AuditLog",
       "app/db.py::User"
     ],
     "children": {}
   },
   "Reporting_Engine": {
-    "description": "Statutory judicial PDF generation with official police footers, Section 65B certificates, and multi-tab Excel workbooks",
+    "description": "9-part court PDF dossiers with Sec 65B certificates, 6-sheet Excel workbooks, Google Earth KML/KMZ exports, and Raw CDR CSV download",
     "components": [
       "app/reports.py::generate_pdf_report",
-      "app/reports.py::generate_excel_report"
+      "app/reports.py::generate_excel_report",
+      "app/reports.py::generate_kml_report",
+      "app/reports.py::generate_kmz_report"
     ],
     "children": {}
   },
   "API_Reference": {
-    "description": "Complete FastAPI REST endpoints reference, authentication models, query parameters, and response schemas",
+    "description": "Complete specification of all 50 REST API endpoints, Pydantic request schemas, query constraints, and RBAC matrix",
     "components": [
       "app/main.py::login",
-      "app/main.py::get_current_case_details",
+      "app/main.py::create_case",
+      "app/main.py::inspect_file_headers",
       "app/main.py::upload_case_file",
-      "app/main.py::load_demo_case",
-      "app/main.py::ask_ai_assistant",
-      "app/main.py::verify_observation"
+      "app/main.py::get_case_analytics",
+      "app/main.py::get_suspect_summary_endpoint",
+      "app/main.py::batch_ipdr_lookup",
+      "app/main.py::ask_assistant",
+      "app/main.py::verify_observation",
+      "app/main.py::download_report",
+      "app/main.py::verify_audit_chain"
+    ],
+    "children": {}
+  },
+  "Upgrade_Blueprint": {
+    "description": "Comprehensive engineering audit & 28-module architectural overhaul specification",
+    "components": [
+      "scripts/generate_police_samples.py",
+      "sample_data/sample_cdr_comprehensive.csv",
+      "sample_data/sample_ipdr_comprehensive.csv"
     ],
     "children": {}
   }
