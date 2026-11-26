@@ -1,129 +1,81 @@
-# Rajasthan Police CDR/IPDR Analysis Tool & AI Investigation Assistant (PS03)
+# System Architecture & Repository Overview
 
-## System Overview & Architecture
+## Executive Summary
 
-The **Rajasthan Police CDR/IPDR Analysis Tool** is a field-ready forensic intelligence platform tailored for cyber crime investigators and senior supervisory police officers. Built for the **Rajasthan Police Hackathon 2026 (Problem Statement PS03)**, the system solves the operational bottleneck of processing high-volume, heterogeneous Call Detail Records (CDR) and Carrier-Grade NAT (CGNAT) Internet Protocol Detail Records (IPDR).
+The **Rajasthan Police Cyber Forensic Command Center** (`Rajistanhackathon` / Problem Statement PS03) is a **dynamic, zero-dummy telecommunications forensics platform** purpose-built for Law Enforcement Agencies (LEAs), Cyber Police Stations, and Special Task Forces.
 
-Equipped with an autonomous **AI Investigation Copilot**, the platform automates complex forensic queries, uncovers hidden crime syndicate links, detects physical co-location meetings, tracks IMEI/SIM swapping anomalies, and resolves CGNAT sessions down to specific subscribers and mobile applications.
+It solves the real-world investigative bottleneck of correlating disparate carrier formats (Bharti Airtel, Reliance Jio, Vodafone Idea, BSNL, DoT LEA exports) across **Call Detail Records (CDR)**, **Carrier-Grade NAT IP Detail Records (IPDR)**, **Base Transceiver Station (BTS) Cell Towers**, and **IMEI/IMSI hardware identities**, while maintaining strict **Section 65B(4) Indian Evidence Act / Section 63 Bharatiya Sakshya Adhiniyam (BSA) 2023** chain-of-custody guarantees.
 
 ---
 
-### High-Level System Architecture
+## Core Architecture & Dynamic Execution Flow
+
+All metrics, graphs, suspect workspaces, and GIS overlays compute dynamically from uploaded case evidence—never from hardcoded fixtures.
 
 ```mermaid
-flowchart TD
-    subgraph Data_Sources["Data Ingestion & Telecom Mediation"]
-        A1["Heterogeneous CDR CSVs (Operator A / B)"]
-        A2["CGNAT IPDR Logs (Telco Carrier Feeds)"]
-        A3["Cell Site Master (Rajasthan Coordinates)"]
-        A4["Dynamic Mapping JSON Configs"]
+flowchart LR
+    subgraph Sources["Telecom Evidence Uploads"]
+        CDR["Multi-Operator CDR<br/>(.csv, .tsv, .xlsx, .xls)"]
+        IPDR["CGNAT IPDR Logs<br/>(IP, Port, Session, App Hint)"]
+        TowerCSV["Master & Embedded BTS Towers<br/>(CGI / Lat-Lon / Azimuth)"]
     end
 
-    subgraph Core_Engine["Core Forensic & Normalization Pipeline"]
-        B1["Ingestion Normalizer (app/ingest.py)"]
-        B2["Validation & Rejection Logger"]
-        B3["SQLite Forensic DB (app/db.py)"]
-        B4["SHA-256 Hash Chained Audit Log (app/audit.py)"]
+    subgraph Pipeline["Normalization & Storage Pipeline"]
+        Inspect["/api/ingest/inspect<br/>(Preamble Strip + Fuzzy Mapping)"]
+        Ingest["app/ingest.py<br/>(MSISDN, ISO Time, Auto Tower Upsert)"]
+        DB[("SQLite DB (app/db.py)<br/>Case, CDRRecord, IPDRRecord,<br/>CellTower, AIObservation, AuditLog")]
     end
 
-    subgraph Analytics_Layer["Forensic Intelligence & Graph Algorithms"]
-        C1["MFC & Day/Night Ratio Analysis"]
-        C2["Cross-Suspect Correlation Matrix"]
-        C3["Cytoscape Network Topology Engine"]
-        C4["Cell Movement & Meeting Proximity"]
-        C5["IMEI / SIM Swap & TAC Lookup"]
-        C6["Carrier-Grade NAT IPDR Resolver"]
+    subgraph Intelligence["Analytical & Copilot Subsystems"]
+        Analytics["app/analysis.py (2,787 LOC)<br/>28 UI Modules + Threat Scoring"]
+        Resolver["app/ipdr.py<br/>Triple-Key CGNAT + Batch"]
+        AI["app/assistant.py (LangGraph)<br/>Bilingual EN/HI/Hinglish"]
+        Exports["app/reports.py<br/>PDF, 6-Sheet XLSX, KML, KMZ"]
     end
 
-    subgraph AI_Copilot["Bilingual AI Copilot (LangGraph)"]
-        D1["Intent Parser (English / Hindi / Hinglish)"]
-        D2["Section 5(2) Telegraph Act Guardrails"]
-        D3["Section 65B Source Evidence Linker"]
-        D4["Dual-Officer Endorsement Workflow"]
-    end
-
-    subgraph Presentation_Layer["User Interfaces & Court Exports"]
-        E1["Cyber Crime Investigation Dashboard (Web SPA)"]
-        E2["Court-Admissible PDF Report (ReportLab)"]
-        E3["Multi-Tab Investigative Excel (openpyxl)"]
-        E4["Tamper-Evident Audit Inspector"]
-    end
-
-    Data_Sources --> Core_Engine
-    Core_Engine --> Analytics_Layer
-    Core_Engine --> AI_Copilot
-    Analytics_Layer --> Presentation_Layer
-    AI_Copilot --> Presentation_Layer
+    CDR & IPDR --> Inspect --> Ingest --> DB
+    TowerCSV --> Ingest
+    DB --> Analytics & Resolver & AI & Exports
 ```
 
 ---
 
-## Core Operational Modules
+## Dual-Sidebar Command UI & 28 Investigation Modules
 
-The codebase is organized into modular services supporting the entire investigation lifecycle:
+The Single-Page Application (`app/static/index.html`, `app/static/app.js`, `app/static/style.css`) implements a Dual-Sidebar architecture using monochrome vector iconography:
 
-| Module | Primary Implementation | Functional Scope |
+1. **Home Command Center Sidebar (`#sidebar-home-menu`):**
+   - **Dashboard Overview** (`dashboard` — 8 Executive KPI cards, Case Registry, Activity & Threat Matrices)
+   - **Cases / FIR Registration** (Modal capturing Case ID, Title, Description, `case_type`, `police_station`, `investigator_name`, and `status`)
+   - **Import CSV / Excel** (`import` — Interactive header preview + mapping override)
+   - **Global Search / Lookup** (`GET /api/lookup`, `GET /api/cases/{case_id}/search`)
+   - **IPDR CGNAT & Bulk 1930 Batch** (`ipdr`, `batch-ipdr`)
+   - **AI Copilot & SP Verification** (`assistant`)
+   - **Audit Chain & Integrity Inspector** (`audit`)
+2. **28 Investigation Modules Sidebar (`#sidebar-investigation-menu`):**
+   - **Overview & Core:** `dashboard`, `advanced-cdr` (Suspect Investigation Workspace with 10 KPI cards, real ownership resolution, and operator distribution), `graph` (4-Quadrant Network Analytics), `raw-cdr` (paginated ledger + client CSV export).
+   - **Subscriber & Device Intelligence:** `mfc`, `network-analysis`, `ownership`, `international`, `service-numbers`, `imei-summary`, `imsi-summary`, `imei-patterns`, `imsi-patterns`.
+   - **Temporal & Mobility Forensics:** `first-last`, `location-summary`, `location-intelligence`, `day-locations`, `day-calls`, `night-locations`, `night-calls`, `movement`, `cell-id-changes`, `location-changes`, `missing-dates`, `interactive-timeline`.
+   - **Spatial & Exports:** `link-analysis`, `geo-map` (**7 Tactical GIS Map Modes** + chronological playback scrubber), `reports` (PDF, XLSX, KML, KMZ).
+
+---
+
+## Relational Database Schema (`app/db.py`)
+
+| ORM Model | Table | Primary Purpose & Lineage Columns |
 | :--- | :--- | :--- |
-| **[Ingestion Engine](ingestion_engine.md)** | `app/ingest.py` | Normalizes heterogeneous telco formats (+91 stripping, date/time parsing, duration seconds conversion), validates data integrity, and stamps chain-of-custody lineage. |
-| **[Forensic Analytics](forensic_analytics.md)** | `app/analysis.py` | 2,000+ lines of forensic routines: Most Frequent Callers (MFC), nocturnal ratio profiling, IMEI/SIM change tracking, TAC handset database, and dormancy analysis. |
-| **[Geospatial Tracking](geospatial_tracking.md)** | `app/analysis.py`, `app/db.py` | Rajasthan cell site dump integration, chronological suspect movement trajectories, azimuth sectors, and spatial-temporal meeting detection algorithms. |
-| **[Network Topology](network_topology.md)** | `app/analysis.py`, `app/static/app.js` | Generates Cytoscape.js network graphs with node degrees, edge weighting by call frequency, and filter thresholds to isolate syndicate kingpins. |
-| **[IPDR NAT Resolver](ipdr_nat_resolver.md)** | `app/ipdr.py` | Resolves public IP + port + timestamp queries across Carrier-Grade NAT (CGNAT) logs to identify subscribers, ISP sources, and encrypted VoIP signatures. |
-| **[AI Investigation Assistant](ai_assistant.md)** | `app/assistant.py` | LangGraph-powered bilingual AI assistant answering queries in English and Hindi/Hinglish, enforcing metadata-only legal guardrails, and citing Section 65B evidence rows. |
-| **[Security & Audit Chain](security_audit_chain.md)** | `app/auth.py`, `app/audit.py` | Multi-tier RBAC (`investigating_officer`, `senior_officer`, `admin`) and SHA-256 hash-chained audit logging ensuring judicial tamper resistance. |
-| **[Reporting Engine](reporting_engine.md)** | `app/reports.py` | Compiles formal judicial PDF reports with Section 65B Evidence Act certificates and structured multi-sheet Excel workbooks. |
-| **[API Reference](api_reference.md)** | `app/main.py` | Full REST API documentation comprising 35+ endpoints covering all analysis, ingestion, authentication, and reporting routes. |
+| `User` | `users` | RBAC officer credentials (`username`, `password_hash`, `role`, `full_name`, `badge_number`) |
+| `Case` | `cases` | FIR metadata & JSON suspect roster (`id`, `title`, `description`, `status`, `created_by`, `brief_data`) |
+| `ImportBatch` | `import_batches` | Ingestion receipt (`filename`, `file_type`, `mapping_name`, `total_rows`, `valid_rows`, `rejected_rows`, `warnings_json`) |
+| `CDRRecord` | `cdr_records` | Normalized telephony/SMS event (`a_number`, `b_number`, `call_type`, `start_time`, `duration_sec`, `imei`, `imsi`, `cell_id`, `source_file`, `source_row`, `raw_data_json`) |
+| `IPDRRecord` | `ipdr_records` | CGNAT session (`subscriber_number`, `source_ip`, `source_port`, `destination_ip`, `destination_port`, `session_start`, `session_end`, `bytes_transferred`, `app_hint`, `source_file`, `source_row`) |
+| `CellTower` | `cell_towers` | Geo-located BTS coordinates (`cell_id`, `lac`, `lat`, `lon`, `area_name`, `azimuth`, `operator`) |
+| `AIObservation` | `ai_observations` | Persisted Copilot outputs (`query_text`, `intent`, `answer_text`, `evidence_json`, `status`, `verified_by`, `verified_at`) |
+| `AuditLog` | `audit_logs` | Tamper-evident SHA-256 ledger (`username`, `role`, `action`, `details`, `ip_address`, `prev_hash`, `entry_hash`) |
 
 ---
 
-## Data Pipeline & Chain of Custody
+## Comprehensive Sample Generator & Engineering Reports
 
-Maintaining forensic integrity is essential for court admissibility under Indian legal statutes. Every single row ingested through the platform preserves its immutable provenance.
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Telco as Telecom Operator Feeds
-    participant Ingest as Ingestion Normalizer
-    participant DB as SQLite Forensic DB
-    participant Audit as Hash-Chain Audit Log
-    participant Officer as Investigating Officer
-
-    Telco->>Ingest: Upload Raw CDR/IPDR CSV
-    Ingest->>Ingest: Apply Operator Mapping Rules
-    Ingest->>Ingest: Normalize Phone Numbers & Timestamps
-    Ingest->>DB: Store with source_file and source_row
-    Ingest->>Audit: Append Upload Event (Compute SHA-256 Hash)
-    Officer->>DB: Execute Cross-Suspect Correlation
-    DB->>Audit: Record Query & Parameters
-    Officer->>Officer: View Source Row Evidence Modal
-```
-
----
-
-## Legal & Statutory Compliance Framework
-
-### 1. Section 65B, Indian Evidence Act (Certificate of Electronic Records)
-- Real-world criminal prosecutions require proof that electronic records have not been altered.
-- The platform automatically stamps every extracted datum with `source_file` and `source_row`.
-- Generated observations and PDF reports include statutory disclaimer footers and audit verification certificates signed by supervisory officers.
-
-### 2. Section 5(2), Indian Telegraph Act (Wiretapping vs. Metadata Separation)
-- The platform enforces an impenetrable AI guardrail: **Voice recordings, message contents, and call audio are categorically rejected.**
-- When queried about call contents (e.g., *"Call me kya baat hui recording sunao"*), the AI assistant politely clarifies that CDR/IPDR data contains transmission metadata only, completely disallowing speculative or illegal wiretap queries.
-
----
-
-## Interactive CodeWiki Navigation
-
-Explore the dedicated module pages for in-depth algorithmic documentation, code signatures, and architecture diagrams:
-
-- 📥 **[Ingestion Engine](ingestion_engine.md)** — Dynamic mapping configs, sanitization & validation
-- 🔍 **[Forensic Analytics](forensic_analytics.md)** — MFC, cross-suspect correlation, IMEI swaps & TAC lookup
-- 📍 **[Geospatial Tracking](geospatial_tracking.md)** — Trajectory timeline & meeting detection algorithm
-- 🕸️ **[Network Topology](network_topology.md)** — Cytoscape graph modeling & syndicate isolation
-- 🌐 **[IPDR NAT Resolver](ipdr_nat_resolver.md)** — CGNAT matching & app signature fingerprinting
-- 🤖 **[AI Investigation Assistant](ai_assistant.md)** — LangGraph engine, bilingual NLP & Section 5(2) guardrails
-- 🛡️ **[Security & Audit Chain](security_audit_chain.md)** — RBAC roles & tamper-evident hash chaining
-- 📑 **[Reporting Engine](reporting_engine.md)** — Formal judicial PDF & multi-sheet Excel generation
-- 🔌 **[API Reference](api_reference.md)** — Complete 35+ REST endpoints specification
+- **Sample Generator:** `scripts/generate_police_samples.py` builds 1,500 comprehensive CDR rows (23 LEA columns), 1,000 CGNAT IPDR rows (24 DoT columns), and 14 geo-tagged Rajasthan BTS towers across `sample_data/` and `data/sample_police_data/`.
+- **Upgrade & UI Audit Documentation:** See [`FORENSIC_MODULES_UPGRADE_REPORT.md`](FORENSIC_MODULES_UPGRADE_REPORT.md) and [`../report.md`](../report.md) for the complete architecture revamp specification.
