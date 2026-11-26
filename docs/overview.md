@@ -4,6 +4,8 @@
 
 The **Rajasthan Police Cyber Forensic Command Center** (`Rajistanhackathon` / Problem Statement PS03) is a **dynamic, zero-dummy telecommunications forensics platform** purpose-built for Law Enforcement Agencies (LEAs), Cyber Police Stations, and Special Task Forces.
 
+![Command Center Walkthrough](assets/forensic_walkthrough.gif)
+
 It solves the real-world investigative bottleneck of correlating disparate carrier formats (Bharti Airtel, Reliance Jio, Vodafone Idea, BSNL, DoT LEA exports) across **Call Detail Records (CDR)**, **Carrier-Grade NAT IP Detail Records (IPDR)**, **Base Transceiver Station (BTS) Cell Towers**, and **IMEI/IMSI hardware identities**, while maintaining strict **Section 65B(4) Indian Evidence Act / Section 63 Bharatiya Sakshya Adhiniyam (BSA) 2023** chain-of-custody guarantees.
 
 ---
@@ -37,6 +39,16 @@ flowchart LR
     TowerCSV --> Ingest
     DB --> Analytics & Resolver & AI & Exports
 ```
+
+---
+
+## Visual Command Modules
+
+| 🎖️ Executive Command Center | 🕸️ 4-Quadrant Syndicate Graph |
+| :---: | :---: |
+| ![Dashboard](assets/screenshots/01_command_dashboard.png) | ![Graph Analytics](assets/screenshots/03_syndicate_graph_analytics.png) |
+| **🛰️ 7-Mode Tactical Police GIS** | **🌐 Carrier NAT IPDR De-Anonymizer** |
+| ![GIS Tracking](assets/screenshots/04_geospatial_gis_tracking.png) | ![IPDR CGNAT](assets/screenshots/05_ipdr_cgnat_resolution.png) |
 
 ---
 
