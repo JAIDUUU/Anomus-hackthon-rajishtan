@@ -365,8 +365,34 @@ def ingest_cdr_data(
             )
             valid_records.append(rec)
 
-    # Bulk insert valid records
+    # Auto-upsert any new CellTowers discovered from coordinates embedded in uploaded CDRs
     if valid_records:
+        existing_cells = {t[0] for t in db.query(CellTower.cell_id).all()}
+        new_discovered_towers = []
+        for rec in valid_records:
+            cid = (rec.cell_id or "").strip()
+            if not cid or cid in existing_cells:
+                continue
+            try:
+                raw_m = json.loads(rec.raw_data_json)
+                lat_val = next((raw_m.get(k) for k in ("Lat", "lat", "Latitude", "latitude", "First Lat", "Cell_Lat") if raw_m.get(k)), "")
+                lon_val = next((raw_m.get(k) for k in ("Lon", "lon", "Long", "Longitude", "longitude", "First Lon", "Cell_Lon") if raw_m.get(k)), "")
+                area_val = next((raw_m.get(k) for k in ("Cell Address", "Area", "area_name", "Location", "Tower Address") if raw_m.get(k)), cid)
+                lac_val = next((raw_m.get(k) for k in ("LAC", "lac") if raw_m.get(k)), "0")
+                if lat_val and lon_val:
+                    new_discovered_towers.append(CellTower(
+                        cell_id=cid,
+                        lac=int(float(lac_val)) if str(lac_val).replace(".", "").isdigit() else 0,
+                        lat=float(lat_val),
+                        lon=float(lon_val),
+                        area_name=str(area_val).strip()
+                    ))
+                    existing_cells.add(cid)
+            except Exception:
+                pass
+        if new_discovered_towers:
+            db.bulk_save_objects(new_discovered_towers)
+
         db.bulk_save_objects(valid_records)
 
     summary = {
@@ -503,39 +529,37 @@ def seed_towers_from_csv(db: Session, csv_path: str | None = None):
     paths_to_try = []
     if csv_path:
         paths_to_try.append(csv_path)
-    # Prefer comprehensive Rajasthan master towers (66 sites) if available
-    paths_to_try.append(os.path.join(base_data, "rajasthan_cell_towers_master.csv"))
-    paths_to_try.append(os.path.join(base_data, "towers.csv"))
-
-    chosen_path = None
-    for p in paths_to_try:
-        if os.path.exists(p):
-            chosen_path = p
-            break
-    if not chosen_path:
-        return
+    else:
+        paths_to_try.extend([
+            os.path.join(base_data, "rajasthan_cell_towers_master.csv"),
+            os.path.join(base_data, "towers.csv"),
+            os.path.join(base_data, "sample_police_data", "sample_cell_towers.csv"),
+        ])
 
     existing_cell_ids = {t[0] for t in db.query(CellTower.cell_id).all()}
-    df = pd.read_csv(chosen_path)
     new_towers = []
-    for _, row in df.iterrows():
-        cid = str(row["cell_id"]).strip()
-        if cid and cid not in existing_cell_ids:
-            lac_val = 0
-            if pd.notna(row.get("lac")):
-                try:
-                    lac_val = int(float(str(row["lac"]).strip()))
-                except Exception:
-                    lac_val = 0
-            t = CellTower(
-                cell_id=cid,
-                lac=lac_val,
-                lat=float(row["lat"]),
-                lon=float(row["lon"]),
-                area_name=str(row["area_name"]).strip()
-            )
-            new_towers.append(t)
-            existing_cell_ids.add(cid)
+    for chosen_path in paths_to_try:
+        if not os.path.exists(chosen_path):
+            continue
+        df = pd.read_csv(chosen_path)
+        for _, row in df.iterrows():
+            cid = str(row["cell_id"]).strip()
+            if cid and cid not in existing_cell_ids:
+                lac_val = 0
+                if pd.notna(row.get("lac")):
+                    try:
+                        lac_val = int(float(str(row["lac"]).strip()))
+                    except Exception:
+                        lac_val = 0
+                t = CellTower(
+                    cell_id=cid,
+                    lac=lac_val,
+                    lat=float(row["lat"]),
+                    lon=float(row["lon"]),
+                    area_name=str(row["area_name"]).strip()
+                )
+                new_towers.append(t)
+                existing_cell_ids.add(cid)
 
     if new_towers:
         db.bulk_save_objects(new_towers)
