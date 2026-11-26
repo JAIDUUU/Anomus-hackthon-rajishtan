@@ -1,99 +1,58 @@
-# Geospatial Tracking & Co-Location Detection
+# Geospatial Tracking & 7-Mode Police GIS Engine
 
 ## Module Overview
 
-The **Geospatial Tracking & Co-Location Detection Engine** (`app/analysis.py`, `app/db.py`) correlates telecommunication metadata with geographic cell site data across Rajasthan districts (Jaipur, Jodhpur, Udaipur, Kota, Ajmer, Bikaner, Alwar).
-
-It enables investigators to:
-1. Reconstruct chronological movement trajectories for any target.
-2. Identify physical co-location and secret meetings between suspects using spatiotemporal proximity algorithms.
-3. Detect anomalous rapid movement and inter-district hops.
+The **Geospatial Tracking Engine** (`app/analysis.py`, `app/ingest.py`, `app/reports.py`, `app/static/app.js`) transforms raw telecom cell tower IDs (`Cell_ID`, `First CGI`, `Last CGI`) into an interactive **Leaflet.js 7-Mode Tactical GIS Workspace** with chronological route playback and **Google Earth KML/KMZ** mission exports.
 
 ---
 
-## Architectural Workflow
+## CGI-Aware Tower Resolution & Auto-Upsert Pipeline
+
+Real telecom LEA CDR logs frequently provide hierarchical Common Global Identities (CGIs) like `404-45-4012-RAJJPR104` or `404-45-4012-40121` alongside shorthand IDs like `RAJ-JPR-104`.
 
 ```mermaid
-flowchart TD
-    A["Suspect CDR Records with Cell ID / CGI"] --> B["Join with Rajasthan Cell Tower DB (app/db.py)"]
-    B --> C["Generate Chronological Trajectory with Lat/Lon/Azimuth"]
-    
-    C --> D["Map Rendering Pipeline (Leaflet.js)"]
-    C --> E["Meeting Detection Algorithm (detect_meetings)"]
-    
-    E --> F{"Temporal Window Check (Δt ≤ threshold)"}
-    F -->|Same Cell Tower + Δt ≤ 30 mins| G["Flag Confirmed Meeting Incident"]
-    F -->|Different Tower or Outside Window| H["Ignore / Normal Routine"]
-    
-    G --> I["Record Incident: Location, Participants, Start/End Time, Evidence IDs"]
-    I --> J["Render on Meeting Detection Map & Judicial PDF Report"]
+flowchart LR
+    CDR["CDR Record cell_id / First CGI"] --> Step1["Exact Match in CellTower Dict"]
+    Step1 -->|Found| Coords["Lat, Lon, Area Name, LAC, Azimuth"]
+    Step1 -->|Miss| Step2["_resolve_tower() Suffix & Token Match<br/>Split on '-' / '_' / ':' (last 1-2 tokens)"]
+    Step2 -->|Found| Coords
+    Step2 -->|Miss| Auto["Extracted at Upload Time via<br/>First CGI Lat/Long or Lat/Lon CSV Columns"]
+    Auto --> Coords
 ```
 
----
-
-## Cell Site Master Model (`CellTower`)
-
-Stored in `prototype.db` and populated via `data/towers.csv`:
-```python
-class CellTower(Base):
-    __tablename__ = "cell_towers"
-
-    id = Column(Integer, primary_key=True, index=True)
-    cell_id = Column(String(50), unique=True, index=True, nullable=False)
-    lac = Column(Integer, default=0)
-    lat = Column(Float, nullable=False)
-    lon = Column(Float, nullable=False)
-    area_name = Column(String(150), nullable=False)
-```
-
-Example tower coordinates in Rajasthan:
-- `RAJ-JPR-101`: MI Road, Jaipur ($26.9124^\circ\text{N}, 75.7873^\circ\text{E}$)
-- `RAJ-JPR-102`: Vaishali Nagar, Jaipur ($26.9056^\circ\text{N}, 75.7420^\circ\text{E}$)
-- `RAJ-JDH-201`: Clock Tower / Sardar Market, Jodhpur ($26.2968^\circ\text{N}, 73.0232^\circ\text{E}$)
-- `RAJ-UDR-301`: City Palace / Lake Pichola, Udaipur ($24.5764^\circ\text{N}, 73.6835^\circ\text{E}$)
-- `RAJ-KOT-401`: Aerodrome Circle, Kota ($25.1524^\circ\text{N}, 75.8342^\circ\text{E}$)
+- **`_resolve_tower(cell_id, towers_dict)` & `_resolve_tower_name(...)`:** Performs exact key lookup followed by delimiter-split token/suffix matching (`-`, `_`, `:`) so full CGIs reliably bind to BTS coordinates.
+- **Automatic Inline Tower Discovery:** During CDR CSV/Excel ingestion (`ingest_cdr_data`), coordinates in `First CGI Lat/Long` (e.g. `26.903/75.742`), `Lat`/`Lon`, and `Tower Address` are parsed and upserted directly into SQLite `cell_towers`.
 
 ---
 
-## Spatiotemporal Co-Location Algorithm
+## 7 Tactical Police GIS Map Modes (`geo-map`)
 
-The `detect_meetings` routine identifies physical convergence without requiring GPS access by leveraging mobile cell registrations.
+Investigators can switch seamlessly among **7 live GIS overlays** powered by real uploaded evidence:
 
-### Mathematical Formulation
-Given two events $E_i = (S_1, \text{Cell}_A, t_i)$ and $E_j = (S_2, \text{Cell}_B, t_j)$ where $S_1 \neq S_2$:
-1. **Spatial Proximity Constraint**:
-   $$\text{Cell}_A = \text{Cell}_B$$
-2. **Temporal Window Constraint**:
-   $$|t_i - t_j| \leq \Delta T_{\text{window}} \quad (\text{default: } 30\text{ minutes})$$
-
-When both constraints hold, an incident candidate is generated. Overlapping candidates within the same time window are merged into an ongoing physical meeting session.
-
-### Python Implementation Snippet
-```python
-def detect_meetings(case_id: str, time_window_minutes: int = 30, db: Session = None):
-    # Retrieve all timestamp-ordered CDR records associated with cell towers
-    records = db.query(CDRRecord, CellTower).join(
-        CellTower, CDRRecord.cell_id == CellTower.cell_id
-    ).filter(CDRRecord.case_id == case_id).order_by(CDRRecord.start_time.asc()).all()
-
-    meetings = []
-    # Slide time window across records sharing identical cell_id
-    # Record participants, start_time, end_time, and source evidence IDs
-    return meetings
-```
+| Map Mode | Backend Endpoint / Function | Investigative Purpose |
+| :--- | :--- | :--- |
+| **1. Cell Towers Pin** | `GET /api/cases/{case_id}/towers/timeline` | Plots all geo-located BTS towers visited by targets with operator, LAC, hit count, and area tooltips |
+| **2. Density Heatmap** | `GET /api/cases/{case_id}/towers/timeline` | Highlights spatial dwell-time hotspots based on call/SMS tower hit density |
+| **3. Route Trajectory + Scrubber** | `GET /api/cases/{case_id}/movement` | Draws chronological polylines with interactive **Play / Pause / Timeline Scrubber** replay showing suspect movement step by step |
+| **4. Day vs. Night Clusters** | `GET /api/cases/{case_id}/analytics` (`day_locations`, `night_locations`) | Contrasts daytime (`06:00–21:59`) workplace/commercial zones against nocturnal (`22:00–05:59`) likely safe-house/residential BTS towers |
+| **5. Sector Azimuth Cones (65°)** | `GET /api/cases/{case_id}/towers/sectors` (`get_tower_sector_cones`) | Projects directional 65° beamwidth sector polygons (`1.2 km` radius across `0°/120°/240°` azimuths) showing approximate RF coverage arcs |
+| **6. Co-Location Meetings** | `GET /api/cases/{case_id}/meetings` (`detect_meetings`) | Highlights exact towers where two suspects triggered events within a configurable time window (`time_window_minutes`, default `30`) |
+| **7. Velocity Anomaly Alerts** | `GET /api/cases/{case_id}/velocity-anomalies` (`get_velocity_anomalies`) | Flags impossible terrestrial travel between sequential tower hops where speed exceeds `max_speed` (`120.0 km/h` default) and `dist_km > 20 km` |
 
 ---
 
-## Movement Trajectory & Inter-District Analysis
+## Key Spatial Algorithms
 
-The `get_movement_and_cell_changes` function analyzes tower hops to identify:
-- **Travel Velocity**: Detects physical travel between distinct cities (e.g., Jaipur to Jodhpur) within plausible transit windows.
-- **Base Tower Identification**: Computes the mode of cell site registrations between 23:00 and 06:00 to establish the suspect's primary residence/hideout.
-- **Operational Tower Identification**: Computes the daytime tower cluster where criminal calls and drop transactions take place.
+### 1. Haversine Distance & Velocity Anomaly Filtering (`get_velocity_anomalies`)
+Using spherical earth distance (`R = 6371.0 km`), the engine calculates inter-tower velocity for consecutive records of a subscriber:
+$$v = \frac{\text{haversine\_km}(\phi_1, \lambda_1, \phi_2, \lambda_2)}{\Delta t_{\text{hours}}}$$
+- **Flight False-Positive Suppression:** Transitions where both endpoints contain `"Airport"` in `tower.area_name` are excluded automatically as commercial aviation transits.
+- **SIM Cloning Indicator:** Sustained ground velocities exceeding `max_speed_kmh` (e.g., jumping Jaipur → Jodhpur in 15 minutes) alert the officer to cloned SIM credentials or simultaneous physical device sharing.
 
----
+### 2. Spatiotemporal Co-Location (`detect_meetings`)
+Scans chronologically ordered BTS logs for suspect pair `(num1, num2)` and computes exact timestamp deltas on shared towers:
+- Returns `cell_id`, `area_name`, `lat`, `lon`, `time_diff_sec`, and independent Section 65B source citations (`event_target_1` and `event_target_2` with `source_file` and `source_row`).
 
-## Module Cross-References
-
-- Co-location findings are embedded into **[AI Investigation Assistant](ai_assistant.md)** for contextual queries.
-- Meeting tables are automatically rendered into **[Reporting Engine](reporting_engine.md)** PDF reports.
+### 3. Google Earth KML / KMZ Export (`generate_kml_report`, `generate_kmz_report`)
+Via `GET /api/cases/{case_id}/report?format=kml` or `format=kmz` (optionally filtered by `?suspect=<phone>`):
+- Exports three structured KML folders: **Cell Towers** (placemark pins), **Suspect Trajectory Route** (`LineString` extruded path), and **Chronological Call Events** (up to 100 timestamped pins with caller/callee/duration popups).
