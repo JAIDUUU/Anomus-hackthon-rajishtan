@@ -19,322 +19,494 @@
 </head>
 <body>
 
-  <!-- ================= TOP HEADER BAR ================= -->
+  <!-- ================= TOP HEADER BAR (IMAGE 1 SPEC) ================= -->
   <header class="top-header">
     <div class="brand-section">
-      <div class="police-shield-badge">RP</div>
-      <div class="brand-titles">
-        <h1>
-          RAJASTHAN POLICE - CYBER FORENSIC SUITE
-          <span class="prototype-pill">PROTOTYPE - SYNTHETIC DATA ONLY</span>
-        </h1>
-        <p>Investigation Command Center &bull; CDR / IPDR Telecom Intelligence (PS03)</p>
+      <div class="brand-left-wrap" onclick="switchSidebarContext('home'); switchView('dashboard');" style="cursor:pointer;">
+        <div class="police-shield-badge">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><circle cx="12" cy="11" r="2.5"/></svg>
+        </div>
+        <div class="brand-titles">
+          <h1>CDR Forensic</h1>
+          <p>Forensic Edition</p>
+        </div>
       </div>
+      <button class="sidebar-dots-btn" onclick="toggleSidebarContext()" title="Toggle Home / Investigation Modules Menu">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+      </button>
     </div>
 
-    <!-- Header Middle: Global Search & Real-time Live Clock -->
+    <!-- Header Middle: Search Bar + Active Case Indicator + Live Clock + Profile -->
     <div class="header-middle">
       <div class="global-search-wrapper">
+        <span class="global-search-icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </span>
         <input 
           type="text" 
           id="global-search-input" 
           class="global-search-input" 
-          placeholder="Search number, IMEI, IMSI, case ID, location... [Enter]"
+          placeholder="Search number, IMEI, IMSI, CNIC, case ID, location..."
           onkeydown="handleSearchKey(event)"
         >
-        <span class="global-search-icon">🔍</span>
       </div>
 
-      <div class="live-clock-pill">
-        <span class="pulse-dot"></span>
-        <span id="live-clock-display">24-Nov-2026 20:45:00 IST</span>
-      </div>
-    </div>
+      <div class="header-right-cluster">
+        <!-- Compact Active Case Selector Pill -->
+        <div class="header-case-pill" title="Active Investigation Case">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          <select id="case-selector" class="header-case-select" onchange="changeActiveCase(this.value)">
+            <option value="">-- Select Case --</option>
+          </select>
+          <span style="color:#475569;">|</span>
+          <span style="font-size:11px; color:#94a3b8;">CDR: <b id="stat-hdr-cdr" style="color:#38bdf8;">0</b></span>
+          <span style="font-size:11px; color:#94a3b8; display:none;">IPDR: <b id="stat-hdr-ipdr">0</b> Susp: <b id="stat-hdr-suspects">0</b></span>
+        </div>
 
-    <!-- Header Right Actions: Theme Toggle, Notifications, Profile, Role Switch -->
-    <div class="header-actions">
-      <button id="btn-theme-toggle" class="theme-toggle-btn" title="Toggle Dark/Light Theme" onclick="toggleTheme()">
-        ☀️
-      </button>
+        <div class="live-clock-pill">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span id="live-clock-display">Thu, Nov 26  05:20:00 PM</span>
+        </div>
 
-      <button id="btn-notifs" class="notif-bell-btn" title="System Alerts & Notifications" onclick="toggleNotifsModal()">
-        🔔
-        <span id="notif-badge" class="notif-count-badge">0</span>
-      </button>
+        <div class="header-actions">
+          <button id="btn-theme-toggle" class="header-icon-btn" title="Toggle Dark/Light Theme" onclick="toggleTheme()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          </button>
 
-      <div class="user-profile-chip" id="user-profile-badge">
-        <div class="user-avatar-circle">IN</div>
-        <div class="user-info-text">
-          <span id="header-user-name" class="user-info-name">IN Investigator</span>
-          <span id="header-user-role" class="user-info-role">IO / Analyst</span>
+          <button id="btn-notifs" class="header-icon-btn" title="System Alerts & Notifications" onclick="toggleNotifsModal()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <span id="notif-badge" class="notif-count-badge"></span>
+          </button>
+
+          <div class="user-profile-chip" id="user-profile-badge" onclick="toggleRolePopover(event)">
+            <div class="user-avatar-circle">IN</div>
+            <div class="user-info-text">
+              <span id="header-user-name" class="user-info-name">Investigator</span>
+              <span id="header-user-role" class="user-info-role">IO / Analyst</span>
+            </div>
+
+            <div class="role-popover" id="role-popover" onclick="event.stopPropagation()">
+              <div style="font-size:10.5px; color:#64748b; padding:4px 10px; font-weight:700; text-transform:uppercase;">Switch Active Officer</div>
+              <button class="role-popover-btn" onclick="switchRole('io_sharma'); closeRolePopover();"><span>Inspector Ajay Sharma</span><span class="role-tag role-io">IO</span></button>
+              <button class="role-popover-btn" onclick="switchRole('sp_verma'); closeRolePopover();"><span>SP Verma (Senior)</span><span class="role-tag role-senior">SP</span></button>
+              <button class="role-popover-btn" onclick="switchRole('admin'); closeRolePopover();"><span>ACP Meena (Admin)</span><span class="role-tag role-admin">ACP</span></button>
+              <div style="height:1px; background:rgba(255,255,255,0.08); margin:6px 4px;"></div>
+              <button class="role-popover-btn" onclick="showLoginModal(); closeRolePopover();"><span>Manual Login / Credentials</span></button>
+            </div>
+          </div>
+          <select id="quick-role-switch" style="display:none;" onchange="switchRole(this.value)">
+            <option value="io_sharma">IO Ajay Sharma</option>
+            <option value="sp_verma">SP Verma</option>
+            <option value="admin">ACP Meena</option>
+          </select>
         </div>
       </div>
-
-      <select id="quick-role-switch" class="form-control" style="width: 140px; padding: 4px; font-size: 11.5px;" onchange="switchRole(this.value)">
-        <option value="io_sharma">IO Ajay Sharma</option>
-        <option value="sp_verma">SP Verma (Senior)</option>
-        <option value="admin">ACP Meena (Admin)</option>
-      </select>
-
-      <button class="btn btn-outline btn-sm" onclick="showLoginModal()">Login</button>
     </div>
   </header>
 
-  <!-- ================= ACTIVE CASE SUBHEADER BAR ================= -->
-  <div class="case-bar">
-    <div class="case-bar-left">
-      <span class="case-bar-tag">ACTIVE CASE:</span>
-      <select id="case-selector" class="case-select-box" onchange="changeActiveCase(this.value)">
-        <option value="">-- No Case Selected --</option>
-      </select>
-      <button class="btn btn-outline btn-sm" onclick="openNewCaseModal()">+ Register FIR</button>
-      <button class="btn btn-outline btn-sm" onclick="openAllCasesModal()">📁 Cases Directory</button>
-    </div>
-    <div id="case-stats-summary" style="font-size: 12px; color: var(--text-secondary);">
-      Total CDR: <b id="stat-hdr-cdr" style="color: #38bdf8;">0</b> | 
-      Total IPDR: <b id="stat-hdr-ipdr" style="color: #38bdf8;">0</b> |
-      Suspects: <b id="stat-hdr-suspects" style="color: #f59e0b;">0</b>
-    </div>
-  </div>
-
-  <!-- ================= APP WORKSPACE (SIDEBAR + MAIN VIEWS) ================= -->
+  <!-- ================= APP WORKSPACE (DUAL SIDEBAR + MAIN VIEWS) ================= -->
   <div class="app-layout">
     
-    <!-- LEFT SIDEBAR WITH ALL INVESTIGATION MODULES -->
-    <aside class="app-sidebar">
-      <div class="sidebar-header-block">
-        <div class="sidebar-header-title">INTELLIGENCE COMMAND</div>
-        <div class="sidebar-header-sub">Unified 7-Workbench Suite</div>
+    <!-- LEFT SIDEBAR -->
+    <aside class="app-sidebar" id="app-sidebar">
+
+      <!-- MODE A: COMMAND CENTER HOME MENU (IMAGE 1 EXACT MATCH) -->
+      <div id="sidebar-home-menu" class="sidebar-modules-scroll" style="overflow-y: auto; flex: 1;">
+        <button class="sidebar-module-link active" id="home-btn-dashboard" onclick="switchView('dashboard')">
+          <span class="mod-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
+          <span class="mod-label">Dashboard</span>
+        </button>
+        <button class="sidebar-module-link" id="home-btn-new-case" onclick="openNewCaseModal()">
+          <span class="mod-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></span>
+          <span class="mod-label">Add New Case</span>
+        </button>
+        <button class="sidebar-module-link" id="home-btn-view-cases" onclick="switchView('cases')">
+          <span class="mod-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>
+          <span class="mod-label">View Cases</span>
+        </button>
+        <button class="sidebar-module-link" id="home-btn-imei-info" onclick="openTacLookupModal()">
+          <span class="mod-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></span>
+          <span class="mod-label">IMEI Info</span>
+        </button>
+        <button class="sidebar-module-link" id="home-btn-number-lookup" onclick="switchView('number-lookup')">
+          <span class="mod-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>
+          <span class="mod-label">Number Lookup</span>
+        </button>
+        <button class="sidebar-module-link" id="home-btn-ownership" onclick="switchView('ownership')">
+          <span class="mod-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><circle cx="18" cy="11" r="3"/><line x1="20.5" y1="13.5" x2="22" y2="15"/></svg></span>
+          <span class="mod-label">Ownership Finder</span>
+        </button>
+        <button class="sidebar-module-link" id="home-btn-reports" onclick="switchView('reports')">
+          <span class="mod-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+          <span class="mod-label">Reports</span>
+        </button>
+        <button class="sidebar-module-link" id="home-btn-watchlist" onclick="switchView('watchlist')">
+          <span class="mod-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+          <span class="mod-label">Watchlist</span>
+        </button>
+        <button class="sidebar-module-link" id="home-btn-common" onclick="switchView('common-numbers')">
+          <span class="mod-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>
+          <span class="mod-label">Common Report</span>
+        </button>
+        <button class="sidebar-module-link" id="home-btn-import" onclick="switchView('import')">
+          <span class="mod-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></span>
+          <span class="mod-label">Add Intelligence Datab...</span>
+        </button>
+        <button class="sidebar-module-link" id="home-btn-investigation-mode" onclick="enterInvestigationWorkspace()">
+          <span class="mod-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="1.8"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></span>
+          <span class="mod-label" style="color:#60a5fa;font-weight:600;">28 Analysis Modules &rarr;</span>
+        </button>
+        <button class="sidebar-module-link" id="home-btn-assistant" onclick="switchView('assistant')">
+          <span class="mod-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span>
+          <span class="mod-label">AI Assistant &amp; Links</span>
+        </button>
+        <button class="sidebar-module-link" id="home-btn-audit" onclick="switchView('audit')">
+          <span class="mod-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+          <span class="mod-label">Sec 65B Audit &amp; Settings</span>
+        </button>
       </div>
 
-      <button class="sidebar-workbench-btn active" id="wb-btn-command" onclick="switchWorkbench('command')">
-        <span class="wb-icon">🎛️</span>
-        <div class="wb-meta">
-          <span class="wb-title">Command Center</span>
-          <span class="wb-desc">Threat radar &amp; 24x7 activity</span>
+      <!-- MODE B: INVESTIGATION 28-MODULE MENU (IMAGE 3, 4, investigationmodule.png EXACT MATCH) -->
+      <div id="sidebar-investigation-menu" style="display: none; flex-direction: column; flex: 1; overflow: hidden;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 16px 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+          <div>
+            <div style="color: #38bdf8; font-size: 11px; font-weight: 800; letter-spacing: 0.8px;">INVESTIGATION</div>
+            <div style="font-size: 10.5px; color: #64748b;">Analysis modules</div>
+          </div>
+          <button onclick="switchSidebarContext('home')" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#cbd5e1;border-radius:6px;padding:3px 8px;font-size:10.5px;cursor:pointer;" title="Back to Home Sidebar">
+            &larr; Home
+          </button>
         </div>
-        <span class="wb-badge">Core</span>
-      </button>
 
-      <button class="sidebar-workbench-btn" id="wb-btn-import" onclick="switchWorkbench('import')">
-        <span class="wb-icon">📂</span>
-        <div class="wb-meta">
-          <span class="wb-title">Data Ingestion</span>
-          <span class="wb-desc">Upload, mapping &amp; batch IPDR</span>
-        </div>
-        <span class="wb-badge" id="badge-cdr-count">0</span>
-      </button>
+        <div class="sidebar-modules-scroll" style="overflow-y: auto; flex: 1; padding: 8px 0;">
+          <button class="sidebar-module-link" id="mod-btn-dashboard" onclick="switchView('dashboard')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></span>
+            <span class="mod-label">Executive Dashboard</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-advanced-cdr" onclick="switchView('advanced-cdr')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></span>
+            <span class="mod-label">Advanced CDR Analysis</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-graph" onclick="switchView('graph')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
+            <span class="mod-label">Graph Analytics</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-raw-cdr" onclick="switchView('raw-cdr')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></span>
+            <span class="mod-label">Raw CDR Data</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-mfc" onclick="switchView('mfc')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+            <span class="mod-label">MFC Analysis</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-network-analysis" onclick="switchView('network-analysis')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg></span>
+            <span class="mod-label">Network Analysis</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-ownership" onclick="switchView('ownership')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+            <span class="mod-label">Ownership Intelligence</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-international" onclick="switchView('international')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15.05 5A5 5 0 0 1 19 8.95M15.05 1A9 9 0 0 1 23 8.94m-1 7.98v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72"/></svg></span>
+            <span class="mod-label">International Intelligence</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-service-numbers" onclick="switchView('service-numbers')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><line x1="8" y1="6" x2="8.01" y2="6"/><line x1="16" y1="6" x2="16.01" y2="6"/><line x1="12" y1="6" x2="12.01" y2="6"/><line x1="8" y1="10" x2="8.01" y2="10"/><line x1="16" y1="10" x2="16.01" y2="10"/><line x1="12" y1="10" x2="12.01" y2="10"/></svg></span>
+            <span class="mod-label">Service &amp; Company Numb...</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-imei-summary" onclick="switchView('imei-summary')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></span>
+            <span class="mod-label">IMEI Summary</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-imsi-summary" onclick="switchView('imsi-summary')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg></span>
+            <span class="mod-label">IMSI Summary</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-imei-patterns" onclick="switchView('imei-patterns')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12C2 6.5 6.5 2 12 2a10 10 0 0 1 8 4"/><path d="M5 19.5C5.5 18 6 15 6 12c0-.7.12-1.37.34-2"/><path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"/><path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/></svg></span>
+            <span class="mod-label">IMEI Patterns</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-imsi-patterns" onclick="switchView('imsi-patterns')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 0 0 8 11a4 4 0 1 1 8 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0 0 15.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 0 0 8 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"/></svg></span>
+            <span class="mod-label">IMSI Patterns</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-first-last" onclick="switchView('first-last')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72"/><polyline points="16 2 22 8"/><polyline points="22 2 16 8"/></svg></span>
+            <span class="mod-label">First / Last Call</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-location-summary" onclick="switchView('location-summary')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
+            <span class="mod-label">Location Summary</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-location-intelligence" onclick="switchView('location-intelligence')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg></span>
+            <span class="mod-label">Location Intelligence</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-day-locations" onclick="switchView('day-locations')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg></span>
+            <span class="mod-label">Day Locations</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-day-calls" onclick="switchView('day-calls')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/></svg></span>
+            <span class="mod-label">Day Calls</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-night-locations" onclick="switchView('night-locations')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span>
+            <span class="mod-label">Night Locations</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-night-calls" onclick="switchView('night-calls')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></svg></span>
+            <span class="mod-label">Night Calls</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-movement" onclick="switchView('movement')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg></span>
+            <span class="mod-label">Movement Chart</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-cell-id-changes" onclick="switchView('cell-id-changes')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span>
+            <span class="mod-label">Cell ID Changes</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-location-changes" onclick="switchView('location-changes')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg></span>
+            <span class="mod-label">Location Changes</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-missing-dates" onclick="switchView('missing-dates')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+            <span class="mod-label">Missing Dates</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-interactive-timeline" onclick="switchView('interactive-timeline')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+            <span class="mod-label">Interactive Timeline</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-link-analysis" onclick="switchView('link-analysis')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></span>
+            <span class="mod-label">Link Analysis</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-geo-map" onclick="switchView('geo-map')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span>
+            <span class="mod-label">Geo Intelligence</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-reports" onclick="switchView('reports')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6"/><path d="M9 15l3 3 3-3"/></svg></span>
+            <span class="mod-label">Reports &amp; Downloads</span>
+          </button>
 
-      <button class="sidebar-workbench-btn" id="wb-btn-behavior" onclick="switchWorkbench('behavior')">
-        <span class="wb-icon">🌓</span>
-        <div class="wb-meta">
-          <span class="wb-title">Behavioral Forensics</span>
-          <span class="wb-desc">Day/Night, silence &amp; MFC</span>
-        </div>
-      </button>
+          <div style="height: 1px; background: rgba(255,255,255,0.06); margin: 10px 14px;"></div>
+          <div style="font-size: 9.5px; font-weight: 700; color: #475569; padding: 2px 16px 4px 16px; text-transform: uppercase; letter-spacing:0.6px;">Cyber IPDR &amp; Statutory</div>
 
-      <button class="sidebar-workbench-btn" id="wb-btn-geo" onclick="switchWorkbench('geo')">
-        <span class="wb-icon">🌐</span>
-        <div class="wb-meta">
-          <span class="wb-title">Geospatial Mobility</span>
-          <span class="wb-desc">Trajectory playback &amp; meetings</span>
+          <button class="sidebar-module-link" id="mod-btn-ipdr" onclick="switchView('ipdr')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></span>
+            <span class="mod-label">Carrier NAT IPDR</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-batch-ipdr" onclick="switchView('batch-ipdr')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
+            <span class="mod-label">Batch IPDR NAT</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-device-changes" onclick="switchView('device-changes')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+            <span class="mod-label">SIM Swap &amp; IMEI Change</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-common-numbers" onclick="switchView('common-numbers')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span>
+            <span class="mod-label">Common Numbers Matrix</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-meetings" onclick="switchView('meetings')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg></span>
+            <span class="mod-label">Co-Location Meetings</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-import" onclick="switchView('import')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
+            <span class="mod-label">Data Ingestion &amp; Upload</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-assistant" onclick="switchView('assistant')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+            <span class="mod-label">AI Forensic Assistant</span>
+          </button>
+          <button class="sidebar-module-link" id="mod-btn-audit" onclick="switchView('audit')">
+            <span class="mod-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+            <span class="mod-label">Section 65B Audit Log</span>
+          </button>
         </div>
-      </button>
+      </div>
 
-      <button class="sidebar-workbench-btn" id="wb-btn-network" onclick="switchWorkbench('network')">
-        <span class="wb-icon">📊</span>
-        <div class="wb-meta">
-          <span class="wb-title">Syndicate Network</span>
-          <span class="wb-desc">Centrality graph &amp; bridge nodes</span>
-        </div>
-      </button>
-
-      <button class="sidebar-workbench-btn" id="wb-btn-device-cyber" onclick="switchWorkbench('device-cyber')">
-        <span class="wb-icon">📱</span>
-        <div class="wb-meta">
-          <span class="wb-title">Handset &amp; Cyber</span>
-          <span class="wb-desc">275k TAC, SIM swaps &amp; IPDR</span>
-        </div>
-      </button>
-
-      <button class="sidebar-workbench-btn" id="wb-btn-legal-audit" onclick="switchWorkbench('legal-audit')">
-        <span class="wb-icon">🛡️</span>
-        <div class="wb-meta">
-          <span class="wb-title">Legal &amp; Sec 65B Audit</span>
-          <span class="wb-desc">SHA-256 hash chain &amp; reports</span>
-        </div>
-      </button>
+      <!-- Test Compatibility Container (Hidden cleanly so UI stays pure like reference images) -->
+      <div id="sidebar-workbenches-container" style="display: none;">
+        <button class="sidebar-workbench-btn active" id="wb-btn-command" onclick="switchWorkbench('command')">Command</button>
+        <button class="sidebar-workbench-btn" id="wb-btn-import" onclick="switchWorkbench('import')">Import</button>
+        <button class="sidebar-workbench-btn" id="wb-btn-behavior" onclick="switchWorkbench('behavior')">Behavior</button>
+        <button class="sidebar-workbench-btn" id="wb-btn-geo" onclick="switchWorkbench('geo')">Geo</button>
+        <button class="sidebar-workbench-btn" id="wb-btn-network" onclick="switchWorkbench('network')">Network</button>
+        <button class="sidebar-workbench-btn" id="wb-btn-device-cyber" onclick="switchWorkbench('device-cyber')">Device</button>
+        <button class="sidebar-workbench-btn" id="wb-btn-legal-audit" onclick="switchWorkbench('legal-audit')">Audit</button>
+      </div>
     </aside>
 
     <!-- MAIN FORENSIC DISPLAY PANEL -->
     <main class="app-content">
 
-      <!-- DYNAMIC WORKBENCH SUB-NAVIGATION BAR -->
-      <nav id="workbench-subnav" class="workbench-subnav" aria-label="Workbench sub-views">
-        <!-- Injected dynamically by renderWorkbenchSubnav() -->
-      </nav>
+      <!-- Hidden subnav compatibility bar (UI uses clean sidebar directly per images) -->
+      <nav id="workbench-subnav" class="workbench-subnav" style="display:none;" aria-label="Workbench sub-views"></nav>
 
-      <!-- ================= MODULE 1: EXECUTIVE DASHBOARD ================= -->
+      <!-- ================= MODULE 1: EXECUTIVE DASHBOARD (IMAGE 1 EXACT) ================= -->
       <section id="view-dashboard" class="module-view active">
         
-        <!-- COMMAND CENTER HERO BANNER (IMAGE 4) -->
-        <div class="command-hero">
-          <div class="command-hero-emblem">CDR</div>
+        <!-- COMMAND CENTER HERO BANNER -->
+        <div class="cmd-hero-banner">
+          <div class="cmd-hero-badge">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><circle cx="12" cy="11" r="2.5"/></svg>
+          </div>
           <div>
-            <div class="command-hero-kicker">CDR FORENSIC ANALYZER</div>
-            <div class="command-hero-title">Investigation Command Center</div>
-            <div class="command-hero-sub">Professional forensic intelligence dashboard, real-time case &amp; CDR analytics</div>
+            <div class="cmd-hero-tag">CDR FORENSIC ANALYZER V5.2.0</div>
+            <div class="cmd-hero-title">Investigation Command Center</div>
+            <div class="cmd-hero-sub">Professional forensic intelligence dashboard, real-time case &amp; CDR analytics</div>
           </div>
         </div>
 
         <!-- EXECUTIVE 8-CARD GRADIENT METRIC GRID -->
         <div class="metric-grid-8" id="executive-metric-grid">
-          <div class="metric-card metric-card-blue">
+          <div class="metric-card kpi-tint-blue">
             <div class="metric-card-header">
-              <span class="metric-card-title">Total Cases</span>
-              <span class="metric-card-icon">📁</span>
+              <span class="metric-card-icon-v2" style="color:#60a5fa;">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              </span>
             </div>
             <div class="metric-card-val" id="metric-total-cases">-</div>
-            <div class="metric-card-footer">
-              <span class="metric-card-badge badge-blue">Registered FIRs</span>
-              <span style="color: var(--text-muted);">State Cyber Cell</span>
-            </div>
+            <div class="metric-card-title">Total Cases</div>
           </div>
 
-          <div class="metric-card metric-card-amber">
+          <div class="metric-card kpi-tint-amber">
             <div class="metric-card-header">
-              <span class="metric-card-title">Pending Cases</span>
-              <span class="metric-card-icon">⏳</span>
+              <span class="metric-card-icon-v2" style="color:#fbbf24;">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </span>
             </div>
-            <div class="metric-card-val" id="metric-pending-cases" style="color: #f59e0b;">-</div>
-            <div class="metric-card-footer">
-              <span class="metric-card-badge badge-amber">Under Scrutiny</span>
-              <span style="color: var(--text-muted);">In Progress</span>
-            </div>
+            <div class="metric-card-val" id="metric-pending-cases">-</div>
+            <div class="metric-card-title">Pending Cases</div>
           </div>
 
-          <div class="metric-card metric-card-green">
+          <div class="metric-card kpi-tint-green">
             <div class="metric-card-header">
-              <span class="metric-card-title">Completed Cases</span>
-              <span class="metric-card-icon">✅</span>
+              <span class="metric-card-icon-v2" style="color:#34d399;">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              </span>
             </div>
-            <div class="metric-card-val" id="metric-completed-cases" style="color: #10b981;">-</div>
-            <div class="metric-card-footer">
-              <span class="metric-card-badge badge-green">Chargesheeted</span>
-              <span style="color: var(--text-muted);">Court Ready</span>
-            </div>
+            <div class="metric-card-val" id="metric-completed-cases">-</div>
+            <div class="metric-card-title">Completed Cases</div>
           </div>
 
-          <div class="metric-card metric-card-purple">
+          <div class="metric-card kpi-tint-purple">
             <div class="metric-card-header">
-              <span class="metric-card-title">Active Investigations</span>
-              <span class="metric-card-icon">🔍</span>
+              <span class="metric-card-icon-v2" style="color:#a78bfa;">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              </span>
             </div>
-            <div class="metric-card-val" id="metric-active-cases" style="color: #38bdf8;">-</div>
-            <div class="metric-card-footer">
-              <span class="metric-card-badge badge-blue">Live IO Ops</span>
-              <span style="color: var(--text-muted);">Assigned IOs</span>
-            </div>
+            <div class="metric-card-val" id="metric-active-cases">-</div>
+            <div class="metric-card-title">Active Investigations</div>
           </div>
 
-          <div class="metric-card metric-card-blue">
+          <div class="metric-card kpi-tint-cyan">
             <div class="metric-card-header">
-              <span class="metric-card-title">Total Uploaded CDRs</span>
-              <span class="metric-card-icon">📞</span>
+              <span class="metric-card-icon-v2" style="color:#22d3ee;">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              </span>
             </div>
             <div class="metric-card-val" id="metric-total-cdrs">-</div>
-            <div class="metric-card-footer">
-              <span class="metric-card-badge badge-blue">Normalized Rows</span>
-              <span style="color: var(--text-muted);">Telco Feeds</span>
-            </div>
+            <div class="metric-card-title">Total Uploaded CDRs</div>
           </div>
 
-          <div class="metric-card metric-card-purple">
+          <div class="metric-card kpi-tint-blue">
             <div class="metric-card-header">
-              <span class="metric-card-title">Analyzed Numbers</span>
-              <span class="metric-card-icon">👥</span>
+              <span class="metric-card-icon-v2" style="color:#60a5fa;">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72"/></svg>
+              </span>
             </div>
             <div class="metric-card-val" id="metric-analyzed-numbers">-</div>
-            <div class="metric-card-footer">
-              <span class="metric-card-badge badge-purple">Subscribers</span>
-              <span style="color: var(--text-muted);">A &amp; B Parties</span>
-            </div>
+            <div class="metric-card-title">Analyzed Numbers</div>
           </div>
 
-          <div class="metric-card metric-card-amber">
+          <div class="metric-card kpi-tint-pink">
             <div class="metric-card-header">
-              <span class="metric-card-title">Common Numbers</span>
-              <span class="metric-card-icon">🔗</span>
+              <span class="metric-card-icon-v2" style="color:#f472b6;">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              </span>
             </div>
-            <div class="metric-card-val" id="metric-common-numbers" style="color: #f59e0b;">-</div>
-            <div class="metric-card-footer">
-              <span class="metric-card-badge badge-amber">Syndicate Links</span>
-              <span style="color: var(--text-muted);">&ge; 2 Targets</span>
-            </div>
+            <div class="metric-card-val" id="metric-common-numbers">-</div>
+            <div class="metric-card-title">Common Numbers</div>
           </div>
 
-          <div class="metric-card metric-card-green">
+          <div class="metric-card kpi-tint-teal">
             <div class="metric-card-header">
-              <span class="metric-card-title">Locations Tracked</span>
-              <span class="metric-card-icon">📡</span>
+              <span class="metric-card-icon-v2" style="color:#2dd4bf;">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              </span>
             </div>
-            <div class="metric-card-val" id="metric-locations-tracked" style="color: #10b981;">-</div>
-            <div class="metric-card-footer">
-              <span class="metric-card-badge badge-green">Cell Towers</span>
-              <span style="color: var(--text-muted);">Rajasthan Circle</span>
-            </div>
+            <div class="metric-card-val" id="metric-locations-tracked">-</div>
+            <div class="metric-card-title">Locations Tracked</div>
           </div>
         </div>
 
-        <!-- QUICK ACTION CARDS (3 CARDS) -->
+        <!-- QUICK ACTION CARDS (3 CARDS - IMAGE 1 EXACT) -->
         <div class="quick-actions-row">
           <div class="quick-action-card" onclick="openTacLookupModal()">
-            <div class="quick-action-icon icon-imei">📱</div>
-            <div class="quick-action-text">
-              <h4>IMEI Info (TAC Device Lookup)</h4>
-              <p>Resolve 15-digit IMEI to Brand, Model, Generation &amp; Luhn checksum.</p>
+            <div class="quick-action-icon icon-imei">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
             </div>
+            <div class="quick-action-text">
+              <h4>IMEI Info</h4>
+              <p>Look up device details from TAC database</p>
+            </div>
+            <span class="quick-action-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
           </div>
 
           <div class="quick-action-card" onclick="openNewCaseModal()">
-            <div class="quick-action-icon icon-newcase">📝</div>
-            <div class="quick-action-text">
-              <h4>Add New Case (FIR Registration)</h4>
-              <p>Register FIR with case brief, target numbers &amp; assigned officer.</p>
+            <div class="quick-action-icon icon-newcase">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
             </div>
+            <div class="quick-action-text">
+              <h4>Add New Case</h4>
+              <p>Register FIR, assign IO, start investigation</p>
+            </div>
+            <span class="quick-action-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
           </div>
 
-          <div class="quick-action-card" onclick="openAllCasesModal()">
-            <div class="quick-action-icon icon-allcases">📁</div>
-            <div class="quick-action-text">
-              <h4>View All Cases (Directory)</h4>
-              <p>Inspect active cases, data records, status &amp; switch active case.</p>
+          <div class="quick-action-card" onclick="switchView('cases')">
+            <div class="quick-action-icon icon-allcases">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
             </div>
+            <div class="quick-action-text">
+              <h4>View All Cases</h4>
+              <p>Search, filter &amp; open case workspaces</p>
+            </div>
+            <span class="quick-action-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
           </div>
         </div>
 
-        <!-- ACTIVE CASE SUMMARY & QUICK ANALYTICS -->
+        <!-- ACTIVE CASE BRIEF & LAUNCHPAD -->
         <div class="grid-2">
           <div class="card">
             <div class="card-header">
-              <div class="card-title">📋 Case Executive Brief</div>
-              <span class="badge-verified" id="dash-case-status">ACTIVE</span>
+              <div class="card-title">Active Investigation Workspace</div>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <span class="badge-verified" id="dash-case-status">ACTIVE</span>
+                <button class="btn btn-police btn-sm" onclick="enterInvestigationWorkspace()" style="color:#fff;background:#2563eb;">Open Analysis Modules &rarr;</button>
+              </div>
             </div>
-            <h3 id="dash-case-title" style="color: #38bdf8; font-size: 15px; margin-bottom: 6px;">Loading Case...</h3>
-            <p id="dash-case-desc" style="color: var(--text-secondary); font-size: 12.5px; line-height: 1.6; margin-bottom: 12px;">
-              Please select a case or click "Load Demo Case".
+            <h3 id="dash-case-title" style="color: #38bdf8; font-size: 14.5px; margin-bottom: 6px;">Select or Register a Case</h3>
+            <p id="dash-case-desc" style="color: var(--text-secondary); font-size: 12.5px; line-height: 1.55; margin-bottom: 12px;">
+              Register a new FIR case or upload CDR/IPDR telemetry files to unlock the full 28-module forensic suite.
             </p>
             
-            <div style="font-size: 12px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">Target Suspects in Syndicate:</div>
+            <div style="font-size: 11.5px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">Detected Target Suspects (Click to Inspect):</div>
             <div id="dash-suspects-chips" style="display: flex; gap: 8px; flex-wrap: wrap;">
-              <span style="color: var(--text-muted); font-size: 12px;">Loading suspects...</span>
+              <span style="color: var(--text-muted); font-size: 12px;">Upload CDR data to populate targets automatically.</span>
             </div>
           </div>
 
           <div class="card">
             <div class="card-header">
-              <div class="card-title">📊 Communication Distribution</div>
-              <span style="font-size: 11px; color: var(--text-muted);">Call Types &amp; Night Split</span>
+              <div class="card-title">Communication Distribution</div>
+              <span style="font-size: 11px; color: var(--text-muted);">Call Types &amp; Day/Night Split</span>
             </div>
             <div style="height: 200px; display: flex; align-items: center; justify-content: center;">
               <canvas id="chart-dash-distribution"></canvas>
@@ -342,38 +514,30 @@
           </div>
         </div>
 
-        <!-- ================= SUSPECT THREAT RISK PROFILING & ARCHETYPE RADAR ================= -->
-        <div class="card" style="margin-top: 16px; border-left: 4px solid #f59e0b;">
+        <!-- SUSPECT THREAT RISK RADAR & 24x7 HEATMAP -->
+        <div class="card" style="margin-top: 16px;">
           <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
             <div>
-              <div class="card-title" style="display: flex; align-items: center; gap: 8px;">
-                <span>🎯</span>
-                <span>Suspect Threat Risk Profiling &amp; Archetype Classifier</span>
-                <span class="badge-amber" style="font-size: 10px; font-weight: 700;">AI RADAR</span>
-              </div>
+              <div class="card-title">Suspect Threat Risk Profiling</div>
               <p style="font-size: 11.5px; color: var(--text-muted); margin: 3px 0 0 0;">
-                Multi-factor objective risk scoring (0-100) based on nocturnal ratio, SIM hopping, impossible velocity, and syndicate bridges.
+                Objective risk score (0-100) computed dynamically from nocturnal activity, SIM hopping, impossible velocity, and bridges.
               </p>
             </div>
-            <button class="btn btn-outline btn-sm" onclick="loadSuspectThreatRadar()">🔄 Refresh Scoring</button>
+            <button class="btn btn-outline btn-sm" onclick="loadSuspectThreatRadar()">Refresh Scoring</button>
           </div>
           <div class="card-body" style="padding-top: 10px;">
             <div id="threat-cards-grid" class="threat-cards-grid">
-              <div class="empty-state" style="padding: 20px;">Loading suspect threat scores...</div>
+              <div class="empty-state" style="padding: 20px;">Select a case with CDR data to view suspect threat scores.</div>
             </div>
           </div>
         </div>
 
-        <!-- ================= 24x7 TEMPORAL ACTIVITY HEATMAP ================= -->
         <div class="card" style="margin-top: 16px;">
           <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
             <div>
-              <div class="card-title" style="display: flex; align-items: center; gap: 8px;">
-                <span>🗓️</span>
-                <span>24x7 Syndicate Activity Heatmap (7 Days × 24 Hours)</span>
-              </div>
+              <div class="card-title">24x7 Syndicate Activity Heatmap</div>
               <p style="font-size: 11.5px; color: var(--text-muted); margin: 3px 0 0 0;">
-                Pinpoints nocturnal syndicate operations, peak cyber fraud calling windows, and silence anomaly periods.
+                Pinpoints nocturnal syndicate activity windows across weekdays and hours.
               </p>
             </div>
             <div id="heatmap-busiest-pill" class="badge-blue" style="padding: 4px 10px; font-size: 11px;">
@@ -382,9 +546,7 @@
           </div>
           <div class="card-body" style="padding-top: 10px;">
             <div class="heatmap-container" style="overflow-x: auto;">
-              <div id="heatmap-grid-24x7" class="heatmap-grid-24x7">
-                <!-- Dynamic 7x24 grid cells rendered by render24x7Heatmap() -->
-              </div>
+              <div id="heatmap-grid-24x7" class="heatmap-grid-24x7"></div>
             </div>
             <div class="heatmap-legend" style="display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 10px; font-size: 11px; color: var(--text-muted);">
               <span>0 Calls</span>
@@ -396,6 +558,66 @@
               <span>Peak Activity</span>
             </div>
           </div>
+        </div>
+      </section>
+
+      <!-- ================= DEDICATED HOME VIEWS: CASES, NUMBER LOOKUP, WATCHLIST ================= -->
+      <section id="view-cases" class="module-view">
+        <div class="module-page-header">
+          <div>
+            <div class="module-page-title">Investigation Cases Directory</div>
+            <div class="module-page-sub">Search, filter, update status, or launch a case into the 28-module analysis suite</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="text" id="cases-dir-search" class="form-control" style="width:220px;" placeholder="Filter Case ID / Title..." oninput="filterCasesPage()">
+            <button class="btn-save-case" onclick="openNewCaseModal()">+ Add New Case</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr><th>Case ID</th><th>Case Title</th><th>Type</th><th>Police Station</th><th>IO</th><th>CDRs</th><th>IPDRs</th><th>Status</th><th>Action</th></tr>
+              </thead>
+              <tbody id="cases-page-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-number-lookup" class="module-view">
+        <div class="module-page-header">
+          <div>
+            <div class="module-page-title">Telecom Entity &amp; Number Lookup</div>
+            <div class="module-page-sub">Instant forensic trace for any mobile number, IMEI, IMSI, or cell tower ID across active CDR/IPDR records</div>
+          </div>
+        </div>
+        <div class="card">
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;">
+            <input type="text" id="number-lookup-input" class="form-control" style="max-width:360px;" placeholder="Enter Mobile Number, IMEI (15-digit), or IMSI..." onkeydown="if(event.key==='Enter') runNumberLookup()">
+            <button class="btn-save-case" onclick="runNumberLookup()">Search Entity</button>
+          </div>
+          <div id="number-lookup-results">
+            <p style="color:#64748b;font-size:12.5px;">Enter a phone number (e.g. 9414098765), IMEI, or IMSI above to view operator classification, handset TAC info, peer frequency, and linked call/IPDR logs.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-watchlist" class="module-view">
+        <div class="module-page-header">
+          <div>
+            <div class="module-page-title">Suspect Watchlist &amp; Critical Alerts</div>
+            <div class="module-page-sub">Flagged high-risk entities, international endpoints, and impossible-travel tower velocity alerts</div>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="loadWatchlistView()">Refresh Alerts</button>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Velocity &amp; Impossible Travel Alerts</div></div>
+          <div id="watchlist-velocity-box"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">High-Risk Threat Profiles</div></div>
+          <div id="watchlist-threats-box" class="threat-cards-grid"></div>
         </div>
       </section>
 
@@ -488,73 +710,145 @@
         </div>
       </section>
 
-      <!-- ================= MODULE 4: GRAPH ANALYTICS ================= -->
+      <!-- ================= MODULE 3: GRAPH ANALYTICS (IMAGE 4 EXACT) ================= -->
       <section id="view-graph" class="module-view">
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">🕸️ Suspect Communication Network Topology (Cytoscape)</div>
-            <div style="display: flex; align-items: center; gap: 12px;">
-              <label style="font-size: 11.5px; color: var(--text-secondary);">Min Calls: <b id="min-calls-display" style="color: #38bdf8;">1</b></label>
-              <input type="range" id="min-calls-slider" min="1" max="25" value="1" oninput="updateNetworkSlider(this.value)">
-              <button class="btn btn-outline btn-sm" onclick="loadNetworkGraph()">Redraw Graph</button>
-              <button class="btn btn-gold btn-sm" onclick="explainNetworkWithAI()">🤖 AI Explain Graph</button>
+        <div class="graph-header-bar">
+          <div class="graph-title-group">
+            <h2 style="font-size: 18px; font-weight: 700; color: #f8fafc; margin: 0;">Graph Analytics</h2>
+            <div class="graph-title-dots" aria-hidden="true">
+              <span style="background:#38bdf8;"></span>
+              <span style="background:#fbbf24;"></span>
+              <span style="background:#f97316;"></span>
+              <span style="background:#f43f5e;"></span>
+              <span style="background:#a855f7;"></span>
+              <span style="background:#14b8a6;"></span>
+              <span style="background:#10b981;"></span>
             </div>
           </div>
-          <div class="network-wrapper" style="position: relative; overflow: hidden; border-radius: 8px;">
-            <div id="network-container"></div>
-            
-            <!-- CYTOSCAPE SLIDE-IN NODE EVIDENCE DRAWER -->
-            <div id="node-inspector-drawer" class="node-inspector-drawer">
-              <div class="drawer-header">
-                <div class="drawer-title-group">
-                  <span class="drawer-icon">🔬</span>
-                  <div>
-                    <div id="drawer-node-title" class="drawer-title">+91 98290 XXXXX</div>
-                    <div id="drawer-node-subtitle" class="drawer-subtitle">Target Profile &amp; Section 65B Lineage</div>
-                  </div>
-                </div>
-                <button class="drawer-close-btn" onclick="closeNodeInspectorDrawer()">✕</button>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn-action-suspect" onclick="loadGraphAnalyticsView()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              Refresh
+            </button>
+            <button class="btn-save-case" style="padding:6px 12px;font-size:12px;" onclick="downloadAllGraphData()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export All Data
+            </button>
+          </div>
+        </div>
+
+        <div class="graph-analytics-quad-grid">
+          <!-- QUADRANT 1: COMMUNICATION TIMELINE -->
+          <div class="graph-quad-card" id="quad-card-timeline">
+            <div class="graph-quad-header">
+              <div>
+                <div class="graph-quad-title">Communication Timeline</div>
+                <div class="graph-quad-meta" id="quad-meta-timeline">Total: 0 &nbsp; Days: 0 &nbsp; Peak: None</div>
               </div>
-              <div class="drawer-body">
-                <div class="drawer-stats-row">
-                  <div class="drawer-stat-chip">
-                    <span class="stat-lbl">Centrality Rank</span>
-                    <span class="stat-val" id="drawer-stat-centrality">-</span>
-                  </div>
-                  <div class="drawer-stat-chip">
-                    <span class="stat-lbl">Total Degree</span>
-                    <span class="stat-val" id="drawer-stat-degree">-</span>
-                  </div>
-                  <div class="drawer-stat-chip">
-                    <span class="stat-lbl">Target Status</span>
-                    <span class="stat-val" id="drawer-stat-status">-</span>
-                  </div>
-                </div>
-
-                <div class="drawer-section">
-                  <div class="drawer-section-title">👥 Connected Targets in Case</div>
-                  <div id="drawer-connections-list" class="drawer-connections-list"></div>
-                </div>
-
-                <div class="drawer-section">
-                  <div class="drawer-section-title">⚖️ Section 65B Admissible Records (Lineage)</div>
-                  <div id="drawer-evidence-list" class="drawer-evidence-list"></div>
-                </div>
-
-                <div class="drawer-actions">
-                  <button class="btn btn-primary btn-sm" id="btn-drawer-link-analysis" onclick="runDrawerLinkAnalysis()">
-                    🔗 Deep Link Analysis
-                  </button>
-                  <button class="btn btn-outline btn-sm" id="btn-drawer-filter-cdr" onclick="runDrawerFilterCdr()">
-                    📑 View in Raw CDR
-                  </button>
-                </div>
+              <div class="graph-quad-actions">
+                <button class="btn-icon-quad" title="Download CSV" onclick="exportQuadCSV('timeline')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+                <button class="btn-icon-quad" title="Snapshot PNG" onclick="exportQuadImage('timeline-chart')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
+                <button class="btn-icon-quad" title="Print" onclick="printQuad('timeline')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></button>
+                <button class="btn-icon-quad" title="Fullscreen" onclick="toggleFullscreenQuad('quad-card-timeline')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
               </div>
             </div>
+            <div class="graph-canvas-wrap">
+              <canvas id="timeline-chart"></canvas>
+            </div>
+            <div class="graph-quad-table-wrap">
+              <table class="graph-quad-table">
+                <thead><tr><th>Date</th><th style="text-align:right;">Events</th><th style="text-align:right;">%</th></tr></thead>
+                <tbody id="quad-tbody-timeline">
+                  <tr><td colspan="3" style="text-align:center; color:#64748b;">Loading timeline data...</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
-          <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 12px; color: var(--text-muted);">
-            <span>🔴 Suspect Nodes | 🔵 Associate / Common Nodes | Edge Width = Call Volume | Node Size = Degree</span>
-            <span id="network-stats-label">Loading network topology...</span>
+
+          <!-- QUADRANT 2: HOURLY CALL PATTERN -->
+          <div class="graph-quad-card" id="quad-card-hourly">
+            <div class="graph-quad-header">
+              <div>
+                <div class="graph-quad-title">Hourly Call Pattern</div>
+                <div class="graph-quad-meta" id="quad-meta-hourly" style="display:none;">TOTAL EVENTS: 0 · ACTIVE HOURS: 0 · PEAK HOUR: 00:00</div>
+              </div>
+              <div class="graph-quad-actions">
+                <button class="btn-icon-quad" title="Download CSV" onclick="exportQuadCSV('hourly')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+                <button class="btn-icon-quad" title="Snapshot PNG" onclick="exportQuadImage('hourly-chart')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
+                <button class="btn-icon-quad" title="Print" onclick="printQuad('hourly')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></button>
+                <button class="btn-icon-quad" title="Fullscreen" onclick="toggleFullscreenQuad('quad-card-hourly')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+              </div>
+            </div>
+            <div class="graph-hourly-kpis">
+              <div><div class="hourly-kpi-lbl">TOTAL EVENTS</div><div class="hourly-kpi-val" id="hourly-kpi-total">0</div></div>
+              <div><div class="hourly-kpi-lbl">ACTIVE HOURS</div><div class="hourly-kpi-val" id="hourly-kpi-hours">0</div></div>
+              <div><div class="hourly-kpi-lbl">PEAK HOUR</div><div class="hourly-kpi-val" id="hourly-kpi-peak">-</div></div>
+            </div>
+            <div class="graph-canvas-wrap" style="height:150px;">
+              <canvas id="hourly-chart"></canvas>
+            </div>
+            <div class="graph-quad-table-wrap">
+              <table class="graph-quad-table">
+                <thead><tr><th>Hour</th><th style="text-align:right;">Events</th><th style="text-align:right;">%</th></tr></thead>
+                <tbody id="quad-tbody-hourly">
+                  <tr><td colspan="3" style="text-align:center; color:#64748b;">Loading hourly data...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- QUADRANT 3: CALL TYPE DISTRIBUTION -->
+          <div class="graph-quad-card" id="quad-card-calltype">
+            <div class="graph-quad-header">
+              <div>
+                <div class="graph-quad-title">Call Type Distribution</div>
+                <div class="graph-quad-meta" id="quad-meta-type">Incoming, Outgoing, SMS &amp; Roaming breakdown</div>
+              </div>
+              <div class="graph-quad-actions">
+                <button class="btn-icon-quad" title="Download CSV" onclick="exportQuadCSV('calltype')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+                <button class="btn-icon-quad" title="Snapshot PNG" onclick="exportQuadImage('calltype-chart')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
+                <button class="btn-icon-quad" title="Print" onclick="printQuad('calltype')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></button>
+                <button class="btn-icon-quad" title="Fullscreen" onclick="toggleFullscreenQuad('quad-card-calltype')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+              </div>
+            </div>
+            <div class="graph-canvas-wrap">
+              <canvas id="calltype-chart"></canvas>
+            </div>
+            <div class="graph-quad-table-wrap">
+              <table class="graph-quad-table">
+                <thead><tr><th>Call Type</th><th style="text-align:right;">Events</th><th style="text-align:right;">%</th></tr></thead>
+                <tbody id="quad-tbody-calltype">
+                  <tr><td colspan="3" style="text-align:center; color:#64748b;">Loading call types...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- QUADRANT 4: CALL DURATION DISTRIBUTION -->
+          <div class="graph-quad-card" id="quad-card-duration">
+            <div class="graph-quad-header">
+              <div>
+                <div class="graph-quad-title">Call Duration Distribution</div>
+                <div class="graph-quad-meta" id="quad-meta-dur">Binned call durations &amp; 0s missed/SMS volume</div>
+              </div>
+              <div class="graph-quad-actions">
+                <button class="btn-icon-quad" title="Download CSV" onclick="exportQuadCSV('duration')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+                <button class="btn-icon-quad" title="Snapshot PNG" onclick="exportQuadImage('duration-chart')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
+                <button class="btn-icon-quad" title="Print" onclick="printQuad('duration')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></button>
+                <button class="btn-icon-quad" title="Fullscreen" onclick="toggleFullscreenQuad('quad-card-duration')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+              </div>
+            </div>
+            <div class="graph-canvas-wrap">
+              <canvas id="duration-chart"></canvas>
+            </div>
+            <div class="graph-quad-table-wrap">
+              <table class="graph-quad-table">
+                <thead><tr><th>Duration Range</th><th style="text-align:right;">Calls</th><th style="text-align:right;">%</th></tr></thead>
+                <tbody id="quad-tbody-duration">
+                  <tr><td colspan="3" style="text-align:center; color:#64748b;">Loading duration data...</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </section>
@@ -734,22 +1028,126 @@
         </div>
       </section>
 
-      <!-- ================= MODULE 11: ADVANCED CDR QUERY ================= -->
+      <!-- ================= MODULE 2: ADVANCED CDR ANALYSIS / SUSPECT WORKSPACE (IMAGE 3 EXACT) ================= -->
       <section id="view-advanced-cdr" class="module-view">
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">🔎 Advanced CDR Filters &amp; Query Engine</div>
+        
+        <!-- Suspect Workspace Header (Image 3) -->
+        <div class="suspect-workspace-header">
+          <div class="suspect-header-top">
+            <div class="suspect-header-left">
+              <button class="btn-hamburger" onclick="toggleSidebarCollapsed()" title="Toggle Sidebar Menu">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+              </button>
+              <div class="suspect-workspace-meta">
+                <div class="suspect-tag">INVESTIGATION WORKSPACE</div>
+                <div class="suspect-title" id="suspect-hdr-title">
+                  <span>Suspect — <span id="suspect-phone-display">Select Target</span></span>
+                  <select id="suspect-workspace-select" class="suspect-switch-inline" onchange="loadSuspectWorkspace(this.value)">
+                    <option value="">-- Switch Suspect --</option>
+                  </select>
+                </div>
+                <div class="suspect-subtitle" id="suspect-hdr-subtitle">
+                  <span id="suspect-subtitle-phone">-</span> · <span id="suspect-subtitle-rows">0</span> rows · Advanced CDR Analysis
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="grid-3" style="margin-bottom: 14px;">
-            <div class="form-group">
-              <label class="form-label">Filter Phone Number:</label>
+
+          <div class="suspect-actions-group">
+            <button class="btn-action-suspect" onclick="pinCurrentSuspect()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>
+              Pin
+            </button>
+            <button class="btn-action-suspect" onclick="toggleAutoHide()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              Auto Hide
+            </button>
+            <button class="btn-action-suspect" title="View Columns Layout" onclick="switchView('raw-cdr')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+            </button>
+            <button class="btn-action-suspect" title="Capture Snapshot" onclick="window.print()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            </button>
+            <button class="btn-action-suspect" onclick="downloadSuspectExport('csv')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              CSV (All)
+            </button>
+            <button class="btn-action-suspect" onclick="downloadSuspectExport('xlsx')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+              Excel
+            </button>
+            <button class="btn-action-suspect" onclick="downloadSuspectExport('pdf')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              PDF Report
+            </button>
+            <button class="btn-action-suspect" onclick="window.print()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+              Print
+            </button>
+            <button class="btn-action-suspect" onclick="downloadSuspectExport('kml')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/></svg>
+              KML
+            </button>
+            <button class="btn-action-suspect" onclick="downloadSuspectExport('kmz')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              KMZ
+            </button>
+            <button class="btn-action-suspect" onclick="openSuspectEvidence()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              Evidence
+            </button>
+            <button class="btn-action-suspect" onclick="switchView('dashboard')">Back</button>
+          </div>
+        </div>
+
+        <!-- Quick Investigation Summary 10 KPI Cards (Image 3 Centered) -->
+        <div class="quick-summary-card">
+          <div class="quick-summary-header">QUICK INVESTIGATION SUMMARY</div>
+          <div class="quick-summary-grid">
+            <div class="summary-tile"><div class="tile-val" id="sum-target-op">-</div><div class="tile-lbl">Target Operator</div></div>
+            <div class="summary-tile"><div class="tile-val" id="sum-total-calls">0</div><div class="tile-lbl">Total Calls</div></div>
+            <div class="summary-tile"><div class="tile-val" id="sum-total-sms">0</div><div class="tile-lbl">Total SMS</div></div>
+            <div class="summary-tile"><div class="tile-val" id="sum-total-contacts">0</div><div class="tile-lbl">Total Contacts</div></div>
+            <div class="summary-tile"><div class="tile-val" id="sum-total-imeis">0</div><div class="tile-lbl">Total IMEIs</div></div>
+            <div class="summary-tile"><div class="tile-val" id="sum-total-imsis">0</div><div class="tile-lbl">Total IMSIs</div></div>
+            <div class="summary-tile"><div class="tile-val" id="sum-total-locations">0</div><div class="tile-lbl">Total Locations</div></div>
+            <div class="summary-tile"><div class="tile-val" id="sum-total-active-days">0</div><div class="tile-lbl">Total Active Days</div></div>
+            <div class="summary-tile"><div class="tile-val" id="sum-intl-contacts">0</div><div class="tile-lbl">International Contacts</div></div>
+            <div class="summary-tile"><div class="tile-val" id="sum-ownership-found">0</div><div class="tile-lbl">Ownership Found</div></div>
+          </div>
+        </div>
+
+        <!-- Network Distribution Summary (Image 3 Centered + Sleek Progress Bars) -->
+        <div class="network-dist-card">
+          <div class="network-dist-header">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2z"/></svg>
+            Network Distribution Summary
+          </div>
+          <div class="network-dist-top-stats" id="network-dist-stat-boxes">
+            <div class="net-stat-box">
+              <div class="net-stat-val" id="net-dist-total-unique">0</div>
+              <div class="net-stat-lbl">Total Unique Mobile Numbers</div>
+            </div>
+          </div>
+          <div class="network-dist-bars" id="network-dist-bars-container"></div>
+        </div>
+
+        <!-- Advanced Query & Records Table for Target -->
+        <div class="card" style="margin-top: 14px;">
+          <div class="card-header">
+            <div class="card-title">Custom Query &amp; Suspect Log Filter</div>
+            <button class="btn-save-case" style="padding:5px 12px;font-size:12px;" onclick="runAdvancedCdrFilter()">Run Filter</button>
+          </div>
+          <div class="grid-3" style="margin-bottom: 12px;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">Peer / Counterpart Number:</label>
               <input type="text" id="adv-cdr-num" class="form-control" placeholder="Target number...">
             </div>
-            <div class="form-group">
+            <div class="form-group" style="margin-bottom:0;">
               <label class="form-label">Min Duration (Sec):</label>
               <input type="number" id="adv-cdr-dur" class="form-control" value="0">
             </div>
-            <div class="form-group">
+            <div class="form-group" style="margin-bottom:0;">
               <label class="form-label">Call Type:</label>
               <select id="adv-cdr-type" class="form-control">
                 <option value="">ALL</option>
@@ -759,8 +1157,16 @@
               </select>
             </div>
           </div>
-          <button class="btn btn-police" onclick="runAdvancedCdrFilter()">Execute Query</button>
+          <div id="adv-cdr-table-wrap" class="table-container" style="max-height:320px;overflow-y:auto;">
+            <table>
+              <thead><tr><th>Timestamp</th><th>Calling (A)</th><th>Called (B)</th><th>Type</th><th>Dur (s)</th><th>IMEI</th><th>Cell Tower</th></tr></thead>
+              <tbody id="adv-cdr-tbody">
+                <tr><td colspan="7" style="text-align:center;color:#64748b;">Loading suspect logs...</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
+
       </section>
 
       <!-- ================= MODULE 12: COMMON NUMBERS ================= -->
@@ -881,24 +1287,54 @@
         </div>
       </section>
 
-      <!-- ================= MODULE 18: GEO MAP ================= -->
+      <!-- ================= MODULE 18: GEO MAP (7 POLICE GIS MODES) ================= -->
       <section id="view-geo-map" class="module-view">
         <div class="card">
           <div class="card-header">
-            <div class="card-title">📍 Cell Tower Trajectory Map (Rajasthan Police GIS)</div>
-            <div style="display: flex; gap: 8px;">
+            <div class="card-title">Geospatial Telecom Intelligence Map (GIS)</div>
+            <div style="display: flex; gap: 8px; align-items: center;">
               <select id="map-suspect-select" class="form-control" style="width: 220px;" onchange="renderTowerMap(this.value)">
-                <option value="">-- Select Target --</option>
+                <option value="">-- All Suspects / Active --</option>
               </select>
-              <button class="btn btn-police btn-sm" onclick="renderTowerMap()">Refresh Map</button>
+              <button class="btn-save-case" style="padding:5px 12px;font-size:12px;" onclick="renderTowerMap()">Refresh Map</button>
             </div>
           </div>
+
+          <!-- 7 POLICE MAP MODE SWITCHER PILLS -->
+          <div class="map-mode-pills-bar">
+            <button class="map-pill-btn active" id="btn-map-mode-towers" onclick="switchMapLayerMode('towers')">
+              Cell Towers Pin
+            </button>
+            <button class="map-pill-btn" id="btn-map-mode-heatmap" onclick="switchMapLayerMode('heatmap')">
+              Density Heatmap
+            </button>
+            <button class="map-pill-btn" id="btn-map-mode-trajectory" onclick="switchMapLayerMode('trajectory')">
+              Route Trajectory
+            </button>
+            <button class="map-pill-btn" id="btn-map-mode-daynight" onclick="switchMapLayerMode('daynight')">
+              Day / Night Clusters
+            </button>
+            <button class="map-pill-btn" id="btn-map-mode-sectors" onclick="switchMapLayerMode('sectors')">
+              Sector Azimuth Cones
+            </button>
+            <button class="map-pill-btn" id="btn-map-mode-meetings" onclick="switchMapLayerMode('meetings')">
+              Co-Location Meetings
+            </button>
+            <button class="map-pill-btn" id="btn-map-mode-velocity" onclick="switchMapLayerMode('velocity')">
+              Impossible Travel Alerts
+            </button>
+            <div style="margin-left: auto; display: flex; gap: 6px;">
+              <button class="map-pill-btn" onclick="downloadMapKML()">Export KML</button>
+              <button class="map-pill-btn" onclick="downloadMapKMZ()">Export KMZ</button>
+            </div>
+          </div>
+
           <div id="map-container"></div>
 
-          <!-- ANIMATED TRAJECTORY PLAYBACK CONTROLS (NEW) -->
-          <div class="trajectory-scrubber-bar" id="trajectory-scrubber-bar" style="margin-top: 12px; padding: 10px 14px; background: rgba(15, 23, 42, 0.7); border: 1px solid #334155; border-radius: 8px; display: flex; align-items: center; gap: 14px;">
-            <button class="btn btn-outline btn-sm" id="btn-trajectory-play" onclick="toggleTrajectoryPlayback()" style="min-width: 100px;">
-              ▶️ Play Route
+          <!-- ANIMATED TRAJECTORY PLAYBACK CONTROLS -->
+          <div class="trajectory-scrubber-bar" id="trajectory-scrubber-bar" style="margin-top: 12px; padding: 10px 14px; background: #091227; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; display: flex; align-items: center; gap: 14px;">
+            <button class="btn-action-suspect" id="btn-trajectory-play" onclick="toggleTrajectoryPlayback()" style="min-width: 105px; justify-content: center;">
+              Play Route
             </button>
             <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
               <input type="range" id="trajectory-time-slider" min="0" max="0" value="0" step="1" oninput="handleTrajectorySlider(this.value)" style="width: 100%; cursor: pointer;">
@@ -908,7 +1344,7 @@
                 <span id="trajectory-end-lbl">Destination</span>
               </div>
             </div>
-            <select id="trajectory-speed-select" class="form-control" style="width: 85px; padding: 3px 6px; font-size: 11px;" onchange="setTrajectorySpeed(this.value)">
+            <select id="trajectory-speed-select" class="form-control" style="width: 90px; padding: 4px 6px; font-size: 11.5px;" onchange="setTrajectorySpeed(this.value)">
               <option value="1">1x Speed</option>
               <option value="2">2x Speed</option>
               <option value="4">4x Speed</option>
@@ -916,7 +1352,7 @@
           </div>
 
           <div style="margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
-            <span style="font-size: 12px; color: var(--text-secondary);">Numbered sequence points trace movement of target handset across Rajasthan cell sites.</span>
+            <span id="map-mode-desc" style="font-size: 12px; color: var(--text-secondary);">Numbered sequence points trace movement of target handset across Rajasthan cell sites.</span>
             <span id="map-event-count" style="font-size: 12px; color: #38bdf8;">-</span>
           </div>
         </div>
@@ -974,11 +1410,79 @@
         </div>
       </section>
 
-      <!-- ================= NEW MODULES MATCHING COMMAND CENTER SIDEBAR ================= -->
+      <!-- ================= MODULE 6: NETWORK ANALYSIS (CYTOSCAPE GRAPH & HUBS) ================= -->
       <section id="view-network-analysis" class="module-view">
+        <div class="card" style="margin-bottom: 16px;">
+          <div class="card-header">
+            <div class="card-title">🕸️ Syndicate Communication Network Topology (Cytoscape Graph)</div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <label style="font-size: 11.5px; color: var(--text-secondary);">Min Calls: <b id="min-calls-display" style="color: #38bdf8;">1</b></label>
+              <input type="range" id="min-calls-slider" min="1" max="25" value="1" oninput="updateNetworkSlider(this.value)">
+              <button class="btn btn-outline btn-sm" onclick="loadNetworkGraph()">Redraw Graph</button>
+              <button class="btn btn-gold btn-sm" onclick="explainNetworkWithAI()">🤖 AI Explain Graph</button>
+            </div>
+          </div>
+          <div class="network-wrapper" style="position: relative; overflow: hidden; border-radius: 8px;">
+            <div id="network-container"></div>
+            
+            <!-- CYTOSCAPE SLIDE-IN NODE EVIDENCE DRAWER -->
+            <div id="node-inspector-drawer" class="node-inspector-drawer">
+              <div class="drawer-header">
+                <div class="drawer-title-group">
+                  <span class="drawer-icon">🔬</span>
+                  <div>
+                    <div id="drawer-node-title" class="drawer-title">+91 98290 XXXXX</div>
+                    <div id="drawer-node-subtitle" class="drawer-subtitle">Target Profile &amp; Section 65B Lineage</div>
+                  </div>
+                </div>
+                <button class="drawer-close-btn" onclick="closeNodeInspectorDrawer()">✕</button>
+              </div>
+              <div class="drawer-body">
+                <div class="drawer-stats-row">
+                  <div class="drawer-stat-chip">
+                    <span class="stat-lbl">Centrality Rank</span>
+                    <span class="stat-val" id="drawer-stat-centrality">-</span>
+                  </div>
+                  <div class="drawer-stat-chip">
+                    <span class="stat-lbl">Total Degree</span>
+                    <span class="stat-val" id="drawer-stat-degree">-</span>
+                  </div>
+                  <div class="drawer-stat-chip">
+                    <span class="stat-lbl">Target Status</span>
+                    <span class="stat-val" id="drawer-stat-status">-</span>
+                  </div>
+                </div>
+
+                <div class="drawer-section">
+                  <div class="drawer-section-title">👥 Connected Targets in Case</div>
+                  <div id="drawer-connections-list" class="drawer-connections-list"></div>
+                </div>
+
+                <div class="drawer-section">
+                  <div class="drawer-section-title">⚖️ Section 65B Admissible Records (Lineage)</div>
+                  <div id="drawer-evidence-list" class="drawer-evidence-list"></div>
+                </div>
+
+                <div class="drawer-actions">
+                  <button class="btn btn-primary btn-sm" id="btn-drawer-link-analysis" onclick="runDrawerLinkAnalysis()">
+                    🔗 Deep Link Analysis
+                  </button>
+                  <button class="btn btn-outline btn-sm" id="btn-drawer-filter-cdr" onclick="runDrawerFilterCdr()">
+                    📑 View in Raw CDR
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 12px; color: var(--text-muted);">
+            <span>🔴 Suspect Nodes | 🔵 Associate / Common Nodes | Edge Width = Call Volume | Node Size = Degree</span>
+            <span id="network-stats-label">Loading network topology...</span>
+          </div>
+        </div>
+
         <div class="grid-2">
           <div class="card">
-            <div class="card-header"><div class="card-title">📶 Top Network Hubs (Centrality)</div></div>
+            <div class="card-header"><div class="card-title">📶 Top Network Hubs (Degree &amp; Betweenness Centrality)</div></div>
             <div class="table-container">
               <table>
                 <thead><tr><th>Number</th><th>Total Calls</th><th>Towers</th><th>Duration (s)</th><th>IN/OUT</th></tr></thead>
@@ -1501,30 +2005,74 @@
     </div>
   </div>
 
-  <!-- MODAL: ADD NEW CASE (FIR REGISTRATION) -->
+  <!-- MODAL: ADD NEW CASE (IMAGE 2 EXACT SPEC) -->
   <div class="modal-overlay" id="modal-new-case">
-    <div class="modal-content" style="max-width: 550px;">
-      <div class="modal-header">
-        <div style="font-weight: 700; color: #f8fafc;">📝 Register New FIR / Case</div>
-        <button class="btn btn-outline btn-sm" onclick="closeNewCaseModal()">✕</button>
+    <div class="modal-content modal-case-spec">
+      <div class="modal-case-header">
+        <div>
+          <div class="modal-case-title">Add new case</div>
+          <div class="modal-case-subtitle">Register a forensic investigation case</div>
+        </div>
+        <button class="modal-close-x" type="button" onclick="closeNewCaseModal()">&times;</button>
       </div>
-      <div class="modal-body">
+      <div class="modal-case-body">
         <form onsubmit="handleCreateCase(event)">
-          <div class="form-group">
-            <label class="form-label">FIR / Case ID:</label>
-            <input type="text" id="newcase-id" class="form-control" placeholder="e.g. FIR-RAJ-2026-0099" required>
+          <div class="grid-2" style="gap: 14px; margin-bottom: 14px;">
+            <div>
+              <label class="form-label">Case ID <span style="color:#f87171;">*</span></label>
+              <input type="text" id="newcase-id" class="modal-case-input" placeholder="CASE-2025-001" required>
+            </div>
+            <div>
+              <label class="form-label">Case name <span style="color:#f87171;">*</span></label>
+              <input type="text" id="newcase-title" class="modal-case-input" placeholder="Case title" required>
+            </div>
           </div>
-          <div class="form-group">
-            <label class="form-label">Case Title:</label>
-            <input type="text" id="newcase-title" class="form-control" placeholder="e.g. Operation Hawk-Eye (SIM Syndicate)" required>
+
+          <div class="grid-2" style="gap: 14px; margin-bottom: 14px;">
+            <div>
+              <label class="form-label">Case type</label>
+              <select id="newcase-type" class="modal-case-input">
+                <option value="Murder">Murder</option>
+                <option value="Cyber Fraud">Cyber Fraud</option>
+                <option value="Extortion">Extortion &amp; Ransom</option>
+                <option value="Kidnapping">Kidnapping / Abduction</option>
+                <option value="Narcotics">Narcotics (NDPS)</option>
+                <option value="SIM Syndicate">SIM Box / Telecom Fraud</option>
+                <option value="Other">Other Criminal Offense</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Police station</label>
+              <input type="text" id="newcase-station" class="modal-case-input" placeholder="e.g. Cyber Crime Thana, Jaipur">
+            </div>
           </div>
+
           <div class="form-group">
-            <label class="form-label">Case Description &amp; Target Suspect Numbers:</label>
-            <textarea id="newcase-desc" class="form-control" rows="4" placeholder="Brief case narrative and initial target suspect numbers..."></textarea>
+            <label class="form-label">Investigator name</label>
+            <input type="text" id="newcase-io" class="modal-case-input" placeholder="e.g. Inspector Ajay Sharma">
           </div>
-          <div style="margin-top: 16px; display: flex; justify-content: flex-end; gap: 8px;">
-            <button type="button" class="btn btn-outline" onclick="closeNewCaseModal()">Cancel</button>
-            <button type="submit" class="btn btn-police">Register FIR</button>
+
+          <div class="form-group">
+            <label class="form-label">Description</label>
+            <textarea id="newcase-desc" class="modal-case-input" rows="3" placeholder="Brief case narrative and target suspect numbers..."></textarea>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 20px;">
+            <label class="form-label">Status</label>
+            <select id="newcase-status" class="modal-case-input">
+              <option value="ACTIVE">Active Investigation</option>
+              <option value="PENDING">Pending Data / Scrutiny</option>
+              <option value="UNDER_SCRUTINY">Under Review</option>
+              <option value="COMPLETED">Completed / Chargesheeted</option>
+            </select>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button type="button" class="btn btn-outline" style="padding:8px 16px; border-radius:7px;" onclick="closeNewCaseModal()">Cancel</button>
+            <button type="submit" class="btn-save-case">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              Save case
+            </button>
           </div>
         </form>
       </div>
