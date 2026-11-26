@@ -508,3 +508,138 @@ def generate_excel_report(case_id: str, db: Session) -> io.BytesIO:
     wb.save(buffer)
     buffer.seek(0)
     return buffer
+
+
+import zipfile
+
+
+def generate_kml_report(case_id: str, db: Session, suspect_phone: str | None = None) -> io.BytesIO:
+    """
+    Generates an OGC-compliant Keyhole Markup Language (KML 2.2) file
+    for Google Earth GIS visualization of cell towers, routes, and meetings.
+    """
+    from app.db import CellTower
+    from app.analysis import detect_meetings, _resolve_tower
+
+    towers = {t.cell_id: t for t in db.query(CellTower).all()}
+
+    query = db.query(CDRRecord).filter(CDRRecord.case_id == case_id)
+    if suspect_phone:
+        query = query.filter(or_(CDRRecord.a_number == suspect_phone, CDRRecord.b_number == suspect_phone))
+    records = query.order_by(CDRRecord.start_time.asc()).all()
+
+    kml_parts = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<kml xmlns="http://www.opengis.net/kml/2.2">',
+        '  <Document>',
+        f'    <name>Case {case_id} - Forensic Mobility Intelligence</name>',
+        '    <description>Rajasthan Police Cyber Forensic Cell - Trajectory & Tower Export</description>',
+        '    <Style id="towerPin">',
+        '      <IconStyle>',
+        '        <scale>1.2</scale>',
+        '        <Icon><href>http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png</href></Icon>',
+        '      </IconStyle>',
+        '    </Style>',
+        '    <Style id="routePath">',
+        '      <LineStyle>',
+        '        <color>ff0000ff</color>',
+        '        <width>4</width>',
+        '      </LineStyle>',
+        '    </Style>',
+        '    <Style id="callPoint">',
+        '      <IconStyle>',
+        '        <scale>0.9</scale>',
+        '        <Icon><href>http://maps.google.com/mapfiles/kml/paddle/red-circle.png</href></Icon>',
+        '      </IconStyle>',
+        '    </Style>',
+        '    <Folder>',
+        '      <name>Cell Towers</name>'
+    ]
+
+    # Add towers visited
+    visited_cells = set()
+    coord_path = []
+
+    for r in records:
+        if r.cell_id:
+            t = _resolve_tower(r.cell_id, towers)
+            if t and t.lat and t.lon:
+                coord_path.append(f"{t.lon},{t.lat},0")
+                if t.cell_id not in visited_cells:
+                    visited_cells.add(t.cell_id)
+                    kml_parts.extend([
+                        '      <Placemark>',
+                        f'        <name>{t.cell_id} - {t.area_name}</name>',
+                        '        <styleUrl>#towerPin</styleUrl>',
+                        f'        <description>Cell ID: {t.cell_id}&lt;br/&gt;Area: {t.area_name}&lt;br/&gt;LAC: {t.lac}</description>',
+                        '        <Point>',
+                        f'          <coordinates>{t.lon},{t.lat},0</coordinates>',
+                        '        </Point>',
+                        '      </Placemark>'
+                    ])
+
+    kml_parts.append('    </Folder>')
+
+    # Add Trajectory Polyline
+    if coord_path:
+        kml_parts.extend([
+            '    <Folder>',
+            '      <name>Suspect Trajectory Route</name>',
+            '      <Placemark>',
+            f'        <name>Mobility Path ({suspect_phone or "Case All"})</name>',
+            '        <styleUrl>#routePath</styleUrl>',
+            f'        <description>Total Tower Hops: {len(coord_path)}</description>',
+            '        <LineString>',
+            '          <extrude>1</extrude>',
+            '          <tessellate>1</tessellate>',
+            '          <coordinates>',
+            '            ' + ' '.join(coord_path),
+            '          </coordinates>',
+            '        </LineString>',
+            '      </Placemark>',
+            '    </Folder>'
+        ])
+
+    # Add Individual Chronological Events (Limit to 100 for responsiveness)
+    kml_parts.extend([
+        '    <Folder>',
+        '      <name>Chronological Call Events</name>'
+    ])
+    for idx, r in enumerate(records[:100], start=1):
+        if r.cell_id:
+            t = _resolve_tower(r.cell_id, towers)
+            if t and t.lat and t.lon:
+                kml_parts.extend([
+                '      <Placemark>',
+                f'        <name>#{idx} - {r.call_type} ({r.start_time})</name>',
+                '        <styleUrl>#callPoint</styleUrl>',
+                f'        <description>Caller: {r.a_number}&lt;br/&gt;Callee: {r.b_number}&lt;br/&gt;Duration: {r.duration_sec}s&lt;br/&gt;Tower: {t.area_name}</description>',
+                '        <Point>',
+                f'          <coordinates>{t.lon},{t.lat},0</coordinates>',
+                '        </Point>',
+                '      </Placemark>'
+            ])
+    kml_parts.append('    </Folder>')
+
+    kml_parts.extend([
+        '  </Document>',
+        '</kml>'
+    ])
+
+    kml_str = '\n'.join(kml_parts)
+    buffer = io.BytesIO()
+    buffer.write(kml_str.encode("utf-8"))
+    buffer.seek(0)
+    return buffer
+
+
+def generate_kmz_report(case_id: str, db: Session, suspect_phone: str | None = None) -> io.BytesIO:
+    """
+    Generates a zipped Keyhole Markup Language (KMZ) file containing doc.kml.
+    """
+    kml_buf = generate_kml_report(case_id, db, suspect_phone)
+    kmz_buf = io.BytesIO()
+    with zipfile.ZipFile(kmz_buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("doc.kml", kml_buf.getvalue())
+    kmz_buf.seek(0)
+    return kmz_buf
