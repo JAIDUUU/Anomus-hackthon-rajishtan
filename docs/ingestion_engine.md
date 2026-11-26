@@ -1,140 +1,93 @@
-# Ingestion Engine & Data Normalization
+# Data Ingestion & Normalization Engine
 
 ## Module Overview
 
-The **Ingestion Engine** (`app/ingest.py`) processes raw telecom data feeds provided by Indian Telecom Service Providers (Airtel, Jio, Vi, BSNL). In real investigations, each telecom operator outputs CDR and IPDR data using completely different column naming conventions, date formats, and call duration representations.
+The **Ingestion Engine** (`app/ingest.py`) is engineered for real-world Indian telecom variability. Law Enforcement Agencies (LEAs) receive CDR and IPDR extracts from Bharti Airtel, Reliance Jio, Vodafone Idea, and BSNL in `.csv`, `.tsv`, `.txt`, `.xlsx`, and `.xls` files—often prefixed by multi-line LEA request headers, inconsistent MSISDN country prefixes, mixed date formats, and `mm:ss` duration strings.
 
-This module provides a unified data mediation pipeline with:
-1. **Dynamic JSON Column Mapping** for plug-and-play operator schemas.
-2. **Robust Data Normalization** for phone numbers, call durations, and multi-format timestamps.
-3. **Data Quality Quarantine & Validation Logging** with per-row rejection reasons.
-4. **Forensic Lineage Tagging** stamping `source_file` and `source_row` for Section 65B compliance.
+Instead of rejecting imperfect files or requiring manual Excel cleanup, the engine performs **automatic header scanning, synonym inference, field normalization, row-level validation reporting, and automatic Cell Tower coordinate extraction**.
 
 ---
 
-## Architectural Flow
+## Multi-Format Ingestion Workflow
 
 ```mermaid
 flowchart TD
-    A["Raw Telecom CSV Upload (Airtel / Jio / BSNL / Vi)"] --> B["Select / Auto-Detect Mapping Config"]
-    B --> C["Stream & Read Line-by-Line with Pandas / IO"]
-    C --> D{"Row Validation Checks"}
+    Upload["Raw File Bytes<br/>(.csv, .tsv, .txt, .xlsx, .xls)"] --> Read["read_tabular_bytes()<br/>Detect Excel ZIP/OLE2 vs Delimited Text"]
+    Read --> Scan["Header & Preamble Scanner<br/>Strip Operator Cover Rows (e.g. 'Bharti Airtel LEA...')"]
     
-    D -->|Missing Required Column or Malformed| E["Quarantine: Log to rejected_rows with Reason"]
-    D -->|Valid Row| F["Phone Normalizer (normalize_phone_number)"]
+    Scan --> Branch{Mode?}
+    Branch -->|Preview Only| Inspect["POST /api/ingest/inspect<br/>Return headers, suggested_mapping & 5 sample rows"]
+    Branch -->|Persist Case Data| Choose{Mapping Source}
     
-    F --> G["Duration Normalizer (parse_duration_to_sec)"]
-    G --> H["Timestamp Normalizer (parse_datetime_flexible)"]
-    H --> I["Attach Legal Lineage: source_file + source_row"]
-    I --> J["Insert into SQLite (CDRRecord / IPDRRecord)"]
+    Choose -->|custom_mapping_json| Custom["Custom Dynamic Slot Override"]
+    Choose -->|mapping_name preset| Preset["9 Presets in data/mappings/*.json"]
+    Choose -->|auto| Fuzzy["Fuzzy Synonym Mapper (_match_column_synonym)"]
     
-    E --> K["Write Validation Summary JSON into ImportBatch"]
-    J --> K
+    Custom & Preset & Fuzzy --> Clean["Normalize MSISDN, Duration, Datetime, IMEI/IMSI"]
+    Clean --> Validate{Valid A-Num, B-Num & Timestamp?}
+    
+    Validate -->|No| Reject["Log Rejection Reason + Increment rejected_rows"]
+    Validate -->|Yes| InsertCDR["Store CDRRecord / IPDRRecord + source_file:source_row"]
+    InsertCDR --> UpsertTower["Auto-Upsert Missing CellTower Coords<br/>(First CGI Lat/Long / Lat-Lon / Cell Address)"]
+    UpsertTower --> Batch["Save ImportBatch Receipt"]
 ```
 
 ---
 
-## Dynamic Column Mappings
+## Supported File Formats & Header Inspection (`read_tabular_bytes` & `inspect_uploaded_file`)
 
-Instead of hardcoded parsers, column associations are stored as configurable JSON definitions in `data/mappings/`. Investigators can inspect, add, or alter mappings at runtime via `/api/mappings`.
-
-### Operator A Example (`data/mappings/operator_a.json`)
-```json
-{
-  "name": "Operator A Standard CDR",
-  "file_type": "CDR",
-  "columns": {
-    "calling_number": "A_PARTY",
-    "called_number": "B_PARTY",
-    "timestamp": "CALL_TIME",
-    "duration": "DURATION_SEC",
-    "call_type": "CALL_TYPE",
-    "imei": "IMEI_NUMBER",
-    "imsi": "IMSI_NUMBER",
-    "cell_id": "FIRST_CELL_ID"
-  },
-  "duration_format": "seconds",
-  "datetime_format": "%Y-%m-%d %H:%M:%S"
-}
-```
-
-### Operator B Example (`data/mappings/operator_b.json`)
-Handles localized prefix variants and minute-second strings (`mm:ss`):
-```json
-{
-  "name": "Operator B Legacy CDR",
-  "file_type": "CDR",
-  "columns": {
-    "calling_number": "SOURCE_CALLER",
-    "called_number": "DEST_TARGET",
-    "timestamp": "DATE_TIME_REC",
-    "duration": "CALL_LEN_MIN_SEC",
-    "call_type": "EVENT_DESC",
-    "imei": "DEVICE_IMEI",
-    "imsi": "CARD_IMSI",
-    "cell_id": "CGI_CODE"
-  },
-  "duration_format": "mm:ss",
-  "datetime_format": "%d/%m/%Y %I:%M %p"
-}
-```
+1. **Spreadsheet Support (`.xlsx`, `.xls`):**
+   - Parsed natively via `pandas.read_excel` (`openpyxl` engine for OOXML, auto-fallback for legacy `.xls`).
+2. **Delimited Text Support (`.csv`, `.tsv`, `.txt`):**
+   - Encodings attempted in order: `utf-8-sig`, `utf-8`, `latin-1`.
+   - Delimiter inference tests `,`, `\t`, `;`, and `|` on LEA cover-sheet lines to pinpoint the true header row containing canonical keywords (`calling`, `caller`, `a party`, `target`, `msisdn`, `subscriber`, `source ip`, `cell`, `call type`, `imei`).
+   - All cover/metadata lines above the detected header row are stripped seamlessly (`preamble_rows_skipped`).
+3. **Zero-Upload Column Preview (`POST /api/ingest/inspect`):**
+   - Returns `filename`, `detected_format`, `columns`, `suggested_mapping` (mapped to canonical slots like `a_number`, `b_number`, `start_time`, `duration`, `cell_id`, `imei`, `imsi`, or IPDR slots `subscriber_number`, `source_ip`, `source_port`, `session_start`), `sample_rows`, and `total_preview_rows`.
 
 ---
 
-## Core Sanitization Algorithms
+## Normalization Primitives (`app/ingest.py`)
 
-### 1. Indian Phone Number Normalization (`normalize_phone_number`)
-Strips international dialing codes (`+91`, `91`), trunk dialing zero (`0`), and whitespace/dashes, returning a canonical 10-digit mobile number:
-```python
-def normalize_phone_number(raw_num: str | None) -> str:
-    if not raw_num or pd.isna(raw_num):
-        return ""
-    s = re.sub(r"[^\d+]", "", str(raw_num).strip())
-    if s.startswith("+91") and len(s) == 13:
-        s = s[3:]
-    elif s.startswith("91") and len(s) == 12:
-        s = s[2:]
-    elif s.startswith("0") and len(s) == 11:
-        s = s[1:]
-    return s
-```
+### 1. Phone Number Standardization (`normalize_phone_number`)
+- Strips `+91`, `0091`, spaces, hyphens, and leading `0` from 10-digit Indian mobile numbers starting with `[6-9]`.
+- Preserves foreign international dial strings (`+971...`, `+44...`) and statutory/short service numbers (`1930`, `112`, `139`, `56161`).
 
 ### 2. Flexible Duration Parser (`parse_duration_to_sec`)
-Handles integer seconds, `mm:ss`, and `hh:mm:ss`:
-- `45` $\rightarrow 45$ seconds
-- `03:20` $\rightarrow 200$ seconds
-- `01:15:30` $\rightarrow 4530$ seconds
+- Converts both integer/float strings (`"765"`, `"182.0"`) and clock formats (`"MM:SS"` such as `"04:35"` -> `275`, or `"HH:MM:SS"` such as `"01:02:10"` -> `3730`).
 
-### 3. Multi-Format Timestamp Parser (`parse_datetime_flexible`)
-Iteratively matches against standard formats:
-- `%Y-%m-%d %H:%M:%S`
-- `%d/%m/%Y %H:%M:%S`
-- `%d-%m-%Y %H:%M:%S`
-- `%d/%m/%Y %I:%M %p` (12-hour AM/PM)
-- `%Y-%m-%dT%H:%M:%S` (ISO8601)
-
-All dates are stored in canonical ISO8601 format (`YYYY-MM-DDTHH:MM:SS`) to enable indexed range queries.
+### 3. Multi-Format Timestamp Normalizer (`parse_datetime_flexible`)
+- Evaluates ISO strings, `DD/MM/YYYY HH:MM:SS`, `DD-MM-YYYY HH:MM:SS`, `YYYY/MM/DD HH:MM:SS`, separate `Call Date` + `Call Time` concatenation, and AM/PM formats—emitting unified ISO-8601 strings (`YYYY-MM-DDTHH:MM:SS`).
 
 ---
 
-## Validation & Quarantine Handling
+## Preset Mappings (`data/mappings/`)
 
-Every batch import produces an `ImportBatch` record containing:
-- `total_rows`: Total physical lines in the uploaded file.
-- `valid_rows`: Number of successfully parsed records stored in the database.
-- `rejected_rows`: Number of discarded rows.
-- `validation_summary_json`: Detailed array listing line number, error code, and rejected payload.
-
-Common rejection categories:
-- `MISSING_CALLER_OR_RECEIVER`: Empty primary phone numbers.
-- `INVALID_IMEI`: IMEI failed length validation (expected 14-16 digits).
-- `UNPARSEABLE_TIMESTAMP`: Non-standard date representation.
-- `DUPLICATE_ROW`: Identical record previously processed.
+| Preset ID | Carrier / Schema Format | Type | Notable Field Handling |
+| :--- | :--- | :--- | :--- |
+| `airtel_lea` | Bharti Airtel LEA Standard CDR | CDR | `Calling Party Telephone Number`, `First CGI`, `Last CGI`, `Dur(s)` |
+| `jio_lea` | Reliance Jio LEA Standard CDR | CDR | VoLTE indicators, `A Party`, `B Party`, `First Cell ID` |
+| `operator_a` | Operator A - DoT 22-Field Standard CDR | CDR | Standard 22-field CMS/DoT schema |
+| `operator_b` | Operator B - Telco MSC Switch 22-Field CDR | CDR | `mm:ss` duration format parsing |
+| `sandhan_operator` | Sandhan Police Format - Standard CDR | CDR | `MOC`/`MTC` direction normalization |
+| `vega_operator` | Vega-4n6 Forensic CDR Schema | CDR | Direction flags & lat/lon columns |
+| `ipdr_operator_a` | Operator A - DoT Carrier NAT 22-Field IPDR | IPDR | Public/Translated IP, Port, Protocol, App Hint |
+| `jio_cgnat_ipdr` | Reliance Jio CGNAT IPDR Format | IPDR | Translated Public IP + Ports + Uplink/Downlink bytes |
+| `sandhan_ipdr` | Sandhan Police Format - IPDR Session Log | IPDR | Session timestamps & subscriber MSISDN |
 
 ---
 
-## Module Cross-References
+## Automatic Cell Tower Co-Discovery & Multi-Source Seeding
 
-- Ingested records feed directly into **[Forensic Analytics](forensic_analytics.md)**.
-- Cell IDs are linked against GIS locations in **[Geospatial Tracking](geospatial_tracking.md)**.
-- IPDR records are processed by the **[IPDR NAT Resolver](ipdr_nat_resolver.md)**.
+Even when uploaded carrier CSVs contain towers absent from static master lookup tables, `ingest_cdr_data` automatically extracts coordinates inline and upserts `CellTower` rows:
+- Parses combined slash/comma coordinate columns (`First CGI Lat/Long` such as `26.903/75.742`, `Last CGI Lat/Long`, `Lat/Long`) or separate `Lat`/`Latitude`/`First Lat` & `Lon`/`Longitude`/`First Lon` columns.
+- Captures `Tower Address` / `Cell Address` / `Area` / `Location` alongside CGI LAC segments (`MCC-MNC-LAC-CELLID`).
+- **Startup Master Seeding (`seed_towers_from_csv`):** Pre-loads towers at boot in priority order from `data/rajasthan_cell_towers_master.csv`, `data/towers.csv`, and `data/sample_police_data/sample_cell_towers.csv`.
+
+---
+
+## Comprehensive Police Sample Formats (`sample_data/`)
+
+Generated by `scripts/generate_police_samples.py`:
+- **`sample_cdr_comprehensive.csv` (1,500 rows, 23 columns):** Includes `Target No`, `Calling Party Telephone Number`, `Called Party Telephone Number`, `Call Type`, `Call Date`, `Call Time`, `Call Date Time`, `Call Duration`, `Dur(s)`, `First Cell ID`, `First CGI`, `First CGI Lat/Long`, `Last Cell ID`, `Last CGI`, `Last CGI Lat/Long`, `Tower Address`, `IMEI`, `IMSI`, `Call Forwarding No`, `SMS Center Number`, `Roaming Circle`, `Service Provider`, `Disconnect Cause`.
+- **`sample_ipdr_comprehensive.csv` (1,000 rows, 24 columns):** Includes `Subscriber MSISDN`, `Source IP`, `Source Port`, `Translated IP`, `Translated Port`, `Destination IP`, `Destination Port`, `Protocol`, `Session Start Time`, `Session End Time`, `Session Duration`, `Data Volume Up Link`, `Data Volume Down Link`, `Total Bytes Transferred`, `Access Point Name`, `App Protocol Hint`, `Application`, `IMEI`, `IMSI`, `First Cell ID`, `Last Cell ID`, `Tower Address`, `Roaming Circle`, `PGW IP Address`.
